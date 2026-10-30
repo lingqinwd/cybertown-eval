@@ -273,6 +273,7 @@ class NPCAgentManager:
                 log_memory_saved(npc_name)
 
             self.last_metrics = {
+                "model_profile": settings.MODEL_PROFILE,
                 "mode": "memory_on" if self.memory_enabled else "memory_off",
                 "npc": npc_name,
                 "message": message,
@@ -292,6 +293,7 @@ class NPCAgentManager:
             import traceback
             traceback.print_exc()
             self.last_metrics = {
+                "model_profile": settings.MODEL_PROFILE,
                 "mode": "memory_on" if self.memory_enabled else "memory_off",
                 "npc": npc_name, "message": message, "memory_recall_count": 0,
                 "request_failed": True,

@@ -85,6 +85,8 @@ async def root():
         "service": settings.API_TITLE,
         "version": settings.API_VERSION,
         "status": "running",
+        "model_profile": settings.MODEL_PROFILE,
+        "memory_mode": settings.MEMORY_MODE,
         "features": ["AI对话", "NPC记忆系统", "好感度系统", "批量状态更新"],
         "endpoints": {
             "docs": "/docs",
@@ -100,7 +102,15 @@ async def root():
 @app.get("/health")
 async def health_check():
     """健康检查"""
-    return {"status": "healthy", "timestamp": "now"}
+    return {"status": "healthy", "timestamp": "now", "model_profile": settings.MODEL_PROFILE,
+            "model": settings.LLM_MODEL_ID, "memory_mode": settings.MEMORY_MODE}
+
+@app.get("/runtime/config")
+async def runtime_config():
+    """返回当前实验配置，不包含 API 密钥。"""
+    return {"model_profile": settings.MODEL_PROFILE, "provider": settings.LLM_PROVIDER,
+            "model": settings.LLM_MODEL_ID, "base_url": settings.LLM_BASE_URL,
+            "memory_mode": settings.MEMORY_MODE}
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat_with_npc(request: ChatRequest):
@@ -136,7 +146,8 @@ async def chat_with_npc(request: ChatRequest):
         
     except Exception as e:
         metrics = dict(getattr(npc_mgr, "last_metrics", {}))
-        metrics.update({"mode": "memory_on" if settings.MEMORY_MODE == "on" else "memory_off",
+        metrics.update({"model_profile": settings.MODEL_PROFILE,
+                        "mode": "memory_on" if settings.MEMORY_MODE == "on" else "memory_off",
                         "npc": request.npc_name, "message": request.message,
                         "request_failed": True, "latency_ms": 0})
         log_metrics_csv(metrics)

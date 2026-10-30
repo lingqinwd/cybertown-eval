@@ -105,7 +105,7 @@ def log_dialogue_end():
 
 def log_metrics_csv(metrics: dict):
     """将每轮可比较指标写入结构化 CSV。"""
-    fields = ["timestamp", "mode", "npc", "message", "latency_ms", "memory_recall_count",
+    fields = ["timestamp", "model_profile", "mode", "npc", "message", "latency_ms", "memory_recall_count",
               "affinity_before", "affinity_after", "request_failed"]
     exists = METRICS_FILE.exists()
     with METRICS_FILE.open("a", encoding="utf-8-sig", newline="") as f:

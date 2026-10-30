@@ -1,10 +1,10 @@
-# CyberTown-Memory-Eval：基于记忆增强的可交互 AI NPC 赛博小镇
+# CyberTown-EdgeCloud：面向可交互 AI NPC 的端云协同推理与记忆增强研究
 
-基于 Datawhale HelloAgents 第 15 章赛博小镇的记忆增强 NPC 实验项目。
+基于 Datawhale HelloAgents 第 15 章赛博小镇的端云协同 NPC 实验项目。
 
 项目保留原始 Godot 4.5.2 像素办公室、玩家移动、NPC 巡逻和 E 键交互，只增加可测量的记忆、好感度和响应延迟信息，用来回答一个清晰的问题：
 
-> 长期情景记忆能否提升 NPC 的跨轮对话一致性？它会带来多少响应延迟？
+> 在不同模型部署位置下，长期情景记忆能否提升 NPC 的跨轮对话一致性？它会带来多少响应延迟？
 
 ## 当前工作副本
 
@@ -26,9 +26,9 @@ experiments/ 消融实验脚本、日志和 CSV 结果模板
 docs/        架构、实验设计、本地部署和 AUP 部署说明
 ```
 
-## DeepSeek 配置
+## 模型配置与切换
 
-后端已经支持 OpenAI 兼容的 DeepSeek 接口。复制配置模板：
+后端通过统一的 OpenAI 兼容接口切换 DeepSeek 云端模型和 AUP 本地小模型。复制配置模板：
 
 ```powershell
 cd backend
@@ -44,7 +44,10 @@ LLM_MODEL_ID=deepseek-chat
 LLM_API_KEY=你的DeepSeek密钥
 DEEPSEEK_API_KEY=你的DeepSeek密钥
 LLM_BASE_URL=https://api.deepseek.com
+MODEL_PROFILE=deepseek
 ```
+
+AUP 小模型使用同一套 `/chat` 接口，只需把 `MODEL_PROFILE` 改为 `aup_local`，并填写 AUP 上 vLLM/Ollama 的 OpenAI 兼容地址。详见 [docs/MODEL_SWITCHING.md](docs/MODEL_SWITCHING.md)。
 
 Embedding 仍使用原有的 DashScope `text-embedding-v3`，因为本项目的长期记忆需要向量化接口；DeepSeek 负责 NPC 回复和好感度分析。`.env` 不得提交到 GitHub。
 
@@ -68,12 +71,14 @@ $env:CYBERTOWN_API_BASE_URL="https://你的AUP代理地址"
 
 ## 实验设计
 
-固定同一模型、同一 NPC 和同一组问题，比较：
+固定同一 NPC 和同一组问题，比较模型部署位置与记忆开关：
 
-| 条件 | 工作记忆 | 情景记忆 | 好感度 |
-|---|---:|---:|---:|
-| Baseline | 否 | 否 | 固定 |
-| Memory | 是 | 是 | 动态 |
+| 条件 | 模型 | 工作/情景记忆 |
+|---|---|---:|
+| 1 | DeepSeek 云端 | 关闭 |
+| 2 | DeepSeek 云端 | 开启 |
+| 3 | AUP 本地小模型 | 关闭 |
+| 4 | AUP 本地小模型 | 开启 |
 
 记录平均、最快、最慢响应延迟，记忆召回次数，事实回忆成功率，好感度变化和请求失败次数。这样可以在不训练模型的情况下形成可复现的课程实验。
 
