@@ -78,6 +78,7 @@ $env:CYBERTOWN_API_BASE_URL="https://你的AUP代理地址"
 记录平均、最快、最慢响应延迟，记忆召回次数，事实回忆成功率，好感度变化和请求失败次数。这样可以在不训练模型的情况下形成可复现的课程实验。
 
 实验结果模板见 [experiments/results_template.csv](experiments/results_template.csv)。
+课堂汇报稿见 [docs/CLASS_PRESENTATION_3MIN.md](docs/CLASS_PRESENTATION_3MIN.md)。
 
 ### 当前截图实验结果
 
