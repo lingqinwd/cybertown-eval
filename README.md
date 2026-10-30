@@ -1,51 +1,75 @@
-# CyberTown-Eval
+# CyberTown-Memory-Eval
 
-一个面向长期记忆、社会关系演化与可控多智能体的浏览器赛博小镇实验。
+基于 Datawhale HelloAgents 第 15 章赛博小镇的记忆增强 NPC 实验项目。
 
-## 目标
+项目保留原始 Godot 4.5.2 像素办公室、玩家移动、NPC 巡逻和 E 键交互，只增加可测量的记忆、好感度和响应延迟信息，用来回答一个清晰的问题：
 
-玩家可以在浏览器中操作角色，在小镇中接近 NPC、对话、完成任务，并观察 NPC 如何根据记忆和好感度改变后续行为。后端保存权威世界状态，模型只提出对话或行动建议，规则层负责验证状态变化。
+> 长期情景记忆能否提升 NPC 的跨轮对话一致性？它会带来多少响应延迟？
 
-## 启动
+## 当前工作副本
 
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python -m backend.main
+```text
+godot/   原始 Godot 2D 项目
+backend/ 原始 FastAPI + HelloAgents 后端
+experiments/      记忆消融实验
+docs/             设计和复现说明
 ```
 
-访问 `http://127.0.0.1:8000`。GPU embedding 可设置：
+`godot` 由教程原始项目复制而来，包含 `main.tscn`、`player.tscn`、`npc.tscn` 和 `dialogue_ui.tscn`。之前的简化原型保存在 `prototype_minimal/`，用于对照，不作为最终演示项目。
+
+## DeepSeek 配置
+
+后端已经支持 OpenAI 兼容的 DeepSeek 接口。复制配置模板：
 
 ```powershell
-$env:CYBERTOWN_EMBEDDING_MODEL="BAAI/bge-small-zh-v1.5"
-$env:CYBERTOWN_DEVICE="cuda"
+cd backend
+Copy-Item .env.deepseek.example .env
+notepad .env
 ```
 
-首次启动时才下载 embedding 权重；服务器准备阶段不会下载。没有 GPU 或模型时会自动回退到轻量检索。
+在 `.env` 中填写本机密钥：
 
-## 操作
+```dotenv
+LLM_PROVIDER=deepseek
+LLM_MODEL_ID=deepseek-chat
+LLM_API_KEY=你的DeepSeek密钥
+DEEPSEEK_API_KEY=你的DeepSeek密钥
+LLM_BASE_URL=https://api.deepseek.com
+```
 
-- WASD 或方向键：移动玩家
-- 点击 NPC：选择居民
-- 走到 NPC 附近后点击“开始对话”
-- 查看右侧记忆、好感度和底部事件时间线
-- 点击“重置世界”重新开始实验
+Embedding 仍使用原有的 DashScope `text-embedding-v3`，因为本项目的长期记忆需要向量化接口；DeepSeek 负责 NPC 回复和好感度分析。`.env` 不得提交到 GitHub。
 
-## 实验版本
+## Godot 与后端地址
 
-| 版本 | 记忆 | 好感度 | 规则校验 | 目的 |
-|---|---|---|---|---|
-| A | 无 | 无 | 弱 | 基础聊天 NPC |
-| B | 有 | 无 | 弱 | 测量记忆作用 |
-| C | 有 | 有 | 弱 | 测量关系变化 |
-| D | 有 | 有 | 强 | 完整可控版本 |
+Godot 默认连接本机：
 
-正式实验使用固定事件脚本和 20～30 轮交互，记录角色一致性、记忆正确率、非法状态修改次数、关系变化、P95 延迟、GPU embedding 延迟和单轮成本。人工评分表暂时留空。
+```text
+http://127.0.0.1:8000
+```
 
-## 目录
+如果以后使用 AUP 后端，可以在启动 Godot 前设置：
 
-- `backend/`：FastAPI API、世界状态机、记忆检索、模型适配
-- `frontend/`：浏览器游戏界面
-- `experiments/`：实验设计和结果模板
-- `data/`：NPC、任务和事件配置
+```powershell
+$env:CYBERTOWN_API_BASE_URL="https://你的AUP代理地址"
+```
+
+这样不需要修改 Godot 场景或脚本。
+
+## 实验设计
+
+固定同一模型、同一 NPC 和同一组问题，比较：
+
+| 条件 | 工作记忆 | 情景记忆 | 好感度 |
+|---|---:|---:|---:|
+| Baseline | 否 | 否 | 固定 |
+| Memory | 是 | 是 | 动态 |
+
+记录平均、最快、最慢响应延迟，记忆召回次数，事实回忆成功率，好感度变化和请求失败次数。这样可以在不训练模型的情况下形成可复现的课程实验。
+
+## 开源注意事项
+
+- 保留 Datawhale HelloAgents 上游项目链接和致谢。
+- 不提交 `.env`、API Key、Qdrant 数据目录和个人对话日志。
+- 第三方图片、音频和字体按各自许可证使用。
+
+
