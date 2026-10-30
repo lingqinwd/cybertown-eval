@@ -11,7 +11,7 @@ class TalkRequest(BaseModel): npc_id:str; message:str=Field(min_length=1,max_len
 @app.get("/")
 def index(): return FileResponse(ROOT/"frontend"/"index.html")
 @app.get("/api/state")
-def state(): return {"state":engine.world.snapshot(),"memory_backend":{"model":engine.memory.model_name,"device":engine.memory.device},"mode":engine.mode}
+def state(): return {"state":engine.world.snapshot(),"memory_backend":{"model":engine.memory.model_name,"device":engine.memory.device},"mode":engine.mode,"llm_provider":engine.dialogue.active_provider,"llm_model":engine.dialogue.model}
 @app.post("/api/move")
 def move(req:MoveRequest): return {"state":engine.world.move(req.dx,req.dy)}
 @app.post("/api/talk")
