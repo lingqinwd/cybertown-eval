@@ -6,6 +6,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel,Field
 from .engine import TownEngine
 ROOT=Path(__file__).resolve().parents[1]; app=FastAPI(title="CyberTown-Eval"); engine=TownEngine(); app.mount("/static",StaticFiles(directory=ROOT/"frontend"),name="static")
+GODOT_WEB=ROOT/"godot_web"
+if GODOT_WEB.exists(): app.mount("/godot",StaticFiles(directory=GODOT_WEB,html=True),name="godot")
 class MoveRequest(BaseModel): dx:int=Field(ge=-1,le=1); dy:int=Field(ge=-1,le=1)
 class TalkRequest(BaseModel): npc_id:str; message:str=Field(min_length=1,max_length=500)
 @app.get("/")

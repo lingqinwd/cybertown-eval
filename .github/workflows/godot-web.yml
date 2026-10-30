@@ -1,0 +1,27 @@
+name: Export Godot Web Client
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "godot/**"
+      - ".github/workflows/godot-web.yml"
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    container:
+      image: barichello/godot-ci:4.4.1
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Export Web build
+        run: |
+          mkdir -p godot/build
+          godot --headless --path godot --export-release "Web" build/index.html
+      - name: Upload Godot Web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cybertown-godot-web
+          path: godot/build
+

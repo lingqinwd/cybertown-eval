@@ -12,4 +12,6 @@ The default backend URL is `http://127.0.0.1:8000/`. For an AUP proxy deployment
 
 ## Export for the browser
 
-Use Godot's Web export preset to generate the HTML5/WebAssembly files, then serve the generated directory from the same AUP server or a static host. Keep the Python backend on the server so API keys remain private. The current script uses HTTP requests; a WebSocket transport can be added later for token streaming and live world events.
+The repository includes a GitHub Actions workflow at `.github/workflows/godot-web.yml`. It exports a real Godot Web build with the official Godot CI image, so the AUP server does not spend quota downloading the large export template archive. After downloading the artifact, place its files in `godot_web/` beside `backend/`; the FastAPI service will serve them at `/godot/`.
+
+Keep the Python backend on the server so API keys remain private. The Godot client uses HTTP requests; a WebSocket transport can be added later for token streaming and live world events.

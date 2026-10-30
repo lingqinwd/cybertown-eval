@@ -14,8 +14,10 @@ var title_label: Label
 var status_label: Label
 var dialogue_label: Label
 var dialogue_input: LineEdit
+var npc_label: Label
 
 func _ready() -> void:
+	_ready_base_url()
 	state_request = HTTPRequest.new()
 	action_request = HTTPRequest.new()
 	add_child(state_request)
@@ -44,7 +46,7 @@ func _build_ui() -> void:
 	status_label = Label.new()
 	status_label.text = "正在连接 CyberTown 后端…"
 	box.add_child(status_label)
-	var npc_label := Label.new()
+	npc_label = Label.new()
 	npc_label.name = "NpcLabel"
 	npc_label.text = "选择一个居民"
 	npc_label.add_theme_font_size_override("font_size", 20)
@@ -62,6 +64,9 @@ func _build_ui() -> void:
 	box.add_child(dialogue_label)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_select_npc_at(get_global_mouse_position())
+		return
 	if not event is InputEventKey or not event.pressed or event.echo:
 		return
 	var key := event as InputEventKey
@@ -73,6 +78,21 @@ func _unhandled_input(event: InputEvent) -> void:
 	if key.keycode in [KEY_D, KEY_RIGHT]: dx = 1
 	if dx != 0 or dy != 0:
 		_move(dx, dy)
+
+func _select_npc_at(point: Vector2) -> void:
+	for npc in world.get("npcs", []):
+		var npc_position := Vector2(32, 32) + Vector2(npc.get("x", 0), npc.get("y", 0)) * cell_size + Vector2(cell_size / 2, cell_size / 2)
+		if npc_position.distance_to(point) <= 24.0:
+			selected_npc = npc
+			npc_label.text = "%s\n%s · 好感度 %s\n%s" % [npc.get("name", "居民"), npc.get("role", "居民"), npc.get("affinity", 0), "；".join(_task_titles(npc.get("tasks", [])))]
+			queue_redraw()
+			return
+
+func _task_titles(tasks: Array) -> Array[String]:
+	var titles: Array[String] = []
+	for task in tasks:
+		titles.append(("✓ " if task.get("done", false) else "○ ") + str(task.get("title", "任务")))
+	return titles
 
 func refresh_state() -> void:
 	var error := state_request.request(_url("api/state"))
@@ -100,7 +120,7 @@ func _on_state_response(result: int, response_code: int, _headers: PackedStringA
 	var parsed = JSON.parse_string(body.get_string_from_utf8())
 	if typeof(parsed) == TYPE_DICTIONARY:
 		world = parsed.get("state", parsed)
-		status_label.text = "memory backend · %s" % parsed.get("memory_backend", {}).get("device", "unknown")
+		status_label.text = "memory backend · %s · dialogue · %s" % [parsed.get("memory_backend", {}).get("device", "unknown"), parsed.get("llm_provider", "fallback")]
 		queue_redraw()
 
 func _on_action_response(result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
@@ -143,4 +163,14 @@ func _draw_actor(actor: Dictionary, is_player: bool) -> void:
 	var position := Vector2(32, 32) + Vector2(actor.get("x", 0), actor.get("y", 0)) * cell_size + Vector2(cell_size / 2, cell_size / 2)
 	draw_circle(position, 18.0 if is_player else 16.0, Color("#101828") if is_player else Color(actor.get("color", "#155eef")))
 	draw_circle(position, 18.0 if is_player else 16.0, Color.WHITE, false, 3.0)
+	if not is_player and actor.get("npc_id", "") == selected_npc.get("npc_id", ""):
+		draw_circle(position, 23.0, Color("#facc15"), false, 4.0)
 	draw_string(ThemeDB.fallback_font, position - Vector2(8, -5), "你" if is_player else str(actor.get("name", "?")).left(1), HORIZONTAL_ALIGNMENT_CENTER, 16, 15, Color.WHITE)
+
+func _ready_base_url() -> void:
+	if not OS.has_feature("web"):
+		return
+	var href := str(JavaScriptBridge.eval("window.location.href"))
+	var godot_marker := href.find("/godot/")
+	if godot_marker >= 0:
+		base_url = href.substr(0, godot_marker)
