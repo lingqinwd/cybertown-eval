@@ -79,6 +79,8 @@ $env:CYBERTOWN_API_BASE_URL="https://你的AUP代理地址"
 
 实验结果模板见 [experiments/results_template.csv](experiments/results_template.csv)。
 
+后端运行时会在 `backend/logs/metrics_YYYY-MM-DD.csv` 写入每轮服务端耗时、记忆召回数、好感度前后值和失败状态；Godot 界面显示的是包含网络往返的客户端端到端耗时。两者分别用于分析后端处理开销和玩家实际等待时间。
+
 ## 开源注意事项
 
 - 保留 Datawhale HelloAgents 上游项目链接和致谢。

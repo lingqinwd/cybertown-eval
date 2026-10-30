@@ -4,6 +4,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
+import time
+from logger import log_metrics_csv
 
 from config import settings
 from models import (
@@ -117,8 +119,13 @@ async def chat_with_npc(request: ChatRequest):
         )
     
     try:
+        started = time.perf_counter()
         # 调用NPC Agent处理对话
         response_text = npc_mgr.chat(request.npc_name, request.message)
+        elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
+        metrics = dict(getattr(npc_mgr, "last_metrics", {}))
+        metrics["latency_ms"] = elapsed_ms
+        log_metrics_csv(metrics)
         
         return ChatResponse(
             npc_name=request.npc_name,
@@ -128,6 +135,11 @@ async def chat_with_npc(request: ChatRequest):
         )
         
     except Exception as e:
+        metrics = dict(getattr(npc_mgr, "last_metrics", {}))
+        metrics.update({"mode": "memory_on" if settings.MEMORY_MODE == "on" else "memory_off",
+                        "npc": request.npc_name, "message": request.message,
+                        "request_failed": True, "latency_ms": 0})
+        log_metrics_csv(metrics)
         raise HTTPException(
             status_code=500,
             detail=f"对话处理失败: {str(e)}"

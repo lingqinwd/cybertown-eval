@@ -110,6 +110,7 @@ class NPCAgentManager:
         self.system_prompts: Dict[str, str] = {}
         self.memories: Dict[str, MemoryManager] = {}  # ⭐ NPC记忆管理器
         self.memory_enabled = settings.MEMORY_MODE in ("on", "true", "1", "enabled")
+        self.last_metrics: Dict[str, object] = {}
         self.relationship_manager: Optional[RelationshipManager] = None  # ⭐ 好感度管理器
 
         print(f"🧪 记忆实验模式: {'开启' if self.memory_enabled else '关闭（基线）'}")
@@ -271,6 +272,16 @@ class NPCAgentManager:
                 )
                 log_memory_saved(npc_name)
 
+            self.last_metrics = {
+                "mode": "memory_on" if self.memory_enabled else "memory_off",
+                "npc": npc_name,
+                "message": message,
+                "memory_recall_count": len(relevant_memories),
+                "affinity_before": affinity_result.get("old_affinity", affinity_result.get("affinity", 50.0)),
+                "affinity_after": affinity_result.get("new_affinity", affinity_result.get("affinity", 50.0)),
+                "request_failed": False,
+            }
+
             # 记录对话结束 ⭐ 使用日志系统
             log_dialogue_end()
 
@@ -280,6 +291,11 @@ class NPCAgentManager:
             print(f"❌ {npc_name}对话失败: {e}")
             import traceback
             traceback.print_exc()
+            self.last_metrics = {
+                "mode": "memory_on" if self.memory_enabled else "memory_off",
+                "npc": npc_name, "message": message, "memory_recall_count": 0,
+                "request_failed": True,
+            }
             return f"抱歉,我现在有点忙,等会儿再聊吧。(错误: {str(e)})"
     
     def _build_memory_context(self, memories: List[MemoryItem]) -> str:

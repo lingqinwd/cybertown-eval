@@ -2,6 +2,7 @@
 
 import logging
 import os
+import csv
 from datetime import datetime
 from pathlib import Path
 
@@ -12,6 +13,7 @@ LOGS_DIR.mkdir(exist_ok=True)
 # 创建日志文件名 (按日期)
 today = datetime.now().strftime("%Y-%m-%d")
 LOG_FILE = LOGS_DIR / f"dialogue_{today}.log"
+METRICS_FILE = LOGS_DIR / f"metrics_{today}.csv"
 
 # 配置日志格式
 LOG_FORMAT = "%(asctime)s - %(message)s"
@@ -100,6 +102,17 @@ def log_dialogue_end():
     """记录对话结束"""
     dialogue_logger.info("=" * 60)
     dialogue_logger.info("✅ 对话完成\n")
+
+def log_metrics_csv(metrics: dict):
+    """将每轮可比较指标写入结构化 CSV。"""
+    fields = ["timestamp", "mode", "npc", "message", "latency_ms", "memory_recall_count",
+              "affinity_before", "affinity_after", "request_failed"]
+    exists = METRICS_FILE.exists()
+    with METRICS_FILE.open("a", encoding="utf-8-sig", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fields)
+        if not exists:
+            writer.writeheader()
+        writer.writerow({key: metrics.get(key, "") for key in fields})
 
 def log_info(message: str):
     """记录普通信息"""

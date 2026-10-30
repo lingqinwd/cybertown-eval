@@ -11,6 +11,7 @@ backend_original/logs/
 backend/memory_data/
 backend/test_memory/
 backend/logs/
+backend/logs/metrics_*.csv
 backend/server.local.*
 experiments/memory_*.log
 experiments/memory_backup*/
