@@ -8,6 +8,10 @@ backend_original/.env
 backend_original/memory_data/
 backend_original/test_memory/
 backend_original/logs/
+backend/memory_data/
+backend/test_memory/
+backend/logs/
+backend/server.local.*
 backend_minimal/
 backend_original/
 godot_original/
