@@ -61,9 +61,16 @@ func _build_ui() -> void:
 	dialogue_label.text = ""
 	box.add_child(dialogue_label)
 
-func _process(_delta: float) -> void:
-	var dx := int(Input.is_action_just_pressed("move_right")) - int(Input.is_action_just_pressed("move_left"))
-	var dy := int(Input.is_action_just_pressed("move_down")) - int(Input.is_action_just_pressed("move_up"))
+func _unhandled_input(event: InputEvent) -> void:
+	if not event is InputEventKey or not event.pressed or event.echo:
+		return
+	var key := event as InputEventKey
+	var dx := 0
+	var dy := 0
+	if key.keycode in [KEY_W, KEY_UP]: dy = -1
+	if key.keycode in [KEY_S, KEY_DOWN]: dy = 1
+	if key.keycode in [KEY_A, KEY_LEFT]: dx = -1
+	if key.keycode in [KEY_D, KEY_RIGHT]: dx = 1
 	if dx != 0 or dy != 0:
 		_move(dx, dy)
 
