@@ -79,6 +79,17 @@ $env:CYBERTOWN_API_BASE_URL="https://你的AUP代理地址"
 
 实验结果模板见 [experiments/results_template.csv](experiments/results_template.csv)。
 
+### 当前截图实验结果
+
+基于 6 次唯一对话的客户端端到端耗时：
+
+| 模式 | 平均 | 最快 | 最慢 | 李四事实回忆 |
+|---|---:|---:|---:|---:|
+| 记忆模式 | 4810 ms | 3630 ms | 7979 ms | 1/1（100%） |
+| 基线模式 | 1542 ms | 1297 ms | 2063 ms | 0/1（0%） |
+
+记忆模式在当前小样本测试中平均多等待约 3268 ms，约为基线的 3.12 倍；代价换来跨轮事实回忆能力。该结果是一次课程实验样本，后续可增加重复次数以降低 DeepSeek 网络波动影响。原始截图数据分别保存在 `experiments/memory_on_screenshot_results.csv` 和 `experiments/memory_off_screenshot_results.csv`。
+
 后端运行时会在 `backend/logs/metrics_YYYY-MM-DD.csv` 写入每轮服务端耗时、记忆召回数、好感度前后值和失败状态；Godot 界面显示的是包含网络往返的客户端端到端耗时。两者分别用于分析后端处理开销和玩家实际等待时间。
 
 ## 开源注意事项
