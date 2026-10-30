@@ -107,8 +107,12 @@ class NPCAgentManager:
             self.llm = None
 
         self.agents: Dict[str, SimpleAgent] = {}
+        self.system_prompts: Dict[str, str] = {}
         self.memories: Dict[str, MemoryManager] = {}  # ⭐ NPC记忆管理器
+        self.memory_enabled = settings.MEMORY_MODE in ("on", "true", "1", "enabled")
         self.relationship_manager: Optional[RelationshipManager] = None  # ⭐ 好感度管理器
+
+        print(f"🧪 记忆实验模式: {'开启' if self.memory_enabled else '关闭（基线）'}")
 
         # 初始化好感度管理器
         if self.llm:
@@ -121,6 +125,7 @@ class NPCAgentManager:
         for name, role in NPC_ROLES.items():
             try:
                 system_prompt = create_system_prompt(name, role)
+                self.system_prompts[name] = system_prompt
 
                 if self.llm:
                     agent = SimpleAgent(
@@ -134,11 +139,12 @@ class NPCAgentManager:
 
                 self.agents[name] = agent
 
-                # ⭐ 创建记忆管理器
-                memory_manager = self._create_memory_manager(name)
+                # 基线模式完全不创建记忆管理器，避免 WorkingMemory/SQLite/Qdrant 参与实验
+                memory_manager = self._create_memory_manager(name) if self.memory_enabled else None
                 self.memories[name] = memory_manager
 
-                print(f"✅ {name}({role['title']}) Agent创建成功 (记忆系统已启用)")
+                mode_label = "记忆系统已启用" if self.memory_enabled else "无长期记忆基线"
+                print(f"✅ {name}({role['title']}) Agent创建成功 ({mode_label})")
 
             except Exception as e:
                 print(f"❌ {name} Agent创建失败: {e}")
@@ -183,6 +189,14 @@ class NPCAgentManager:
         agent = self.agents[npc_name]
         memory_manager = self.memories.get(npc_name)
 
+        # 基线模式还要隔离 SimpleAgent 的进程内聊天历史，避免短期上下文伪装成长期记忆
+        if not self.memory_enabled and self.llm is not None:
+            agent = SimpleAgent(
+                name=f"{npc_name}-{NPC_ROLES[npc_name]['title']}-baseline",
+                llm=self.llm,
+                system_prompt=self.system_prompts[npc_name],
+            )
+
         if agent is None:
             # 模拟模式回复
             role = NPC_ROLES[npc_name]
@@ -208,7 +222,7 @@ class NPCAgentManager:
 
             # ⭐ 2. 检索相关记忆
             relevant_memories = []
-            if memory_manager:
+            if self.memory_enabled and memory_manager:
                 relevant_memories = memory_manager.retrieve_memories(
                     query=message,
                     memory_types=["working", "episodic"],
@@ -246,7 +260,7 @@ class NPCAgentManager:
                 affinity_result = {"changed": False, "affinity": 50.0}
 
             # ⭐ 6. 保存对话到记忆 (包含好感度信息)
-            if memory_manager:
+            if self.memory_enabled and memory_manager:
                 self._save_conversation_to_memory(
                     memory_manager=memory_manager,
                     npc_name=npc_name,

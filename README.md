@@ -1,4 +1,4 @@
-# CyberTown-Memory-Eval
+# CyberTown-Memory-Eval：基于记忆增强的可交互 AI NPC 赛博小镇
 
 基于 Datawhale HelloAgents 第 15 章赛博小镇的记忆增强 NPC 实验项目。
 
@@ -16,6 +16,15 @@ docs/             设计和复现说明
 ```
 
 `godot` 由教程原始项目复制而来，包含 `main.tscn`、`player.tscn`、`npc.tscn` 和 `dialogue_ui.tscn`。之前的简化原型保存在 `prototype_minimal/`，用于对照，不作为最终演示项目。
+
+## 项目结构
+
+```text
+godot/       原始 Godot 4.5.2 2D 游戏客户端
+backend/     FastAPI、NPC Agent、DeepSeek 适配和记忆系统
+experiments/ 消融实验脚本、日志和 CSV 结果模板
+docs/        架构、实验设计、本地部署和 AUP 部署说明
+```
 
 ## DeepSeek 配置
 
@@ -55,6 +64,8 @@ $env:CYBERTOWN_API_BASE_URL="https://你的AUP代理地址"
 
 这样不需要修改 Godot 场景或脚本。
 
+完整的本地和 AUP 部署流程见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
+
 ## 实验设计
 
 固定同一模型、同一 NPC 和同一组问题，比较：
@@ -65,6 +76,8 @@ $env:CYBERTOWN_API_BASE_URL="https://你的AUP代理地址"
 | Memory | 是 | 是 | 动态 |
 
 记录平均、最快、最慢响应延迟，记忆召回次数，事实回忆成功率，好感度变化和请求失败次数。这样可以在不训练模型的情况下形成可复现的课程实验。
+
+实验结果模板见 [experiments/results_template.csv](experiments/results_template.csv)。
 
 ## 开源注意事项
 

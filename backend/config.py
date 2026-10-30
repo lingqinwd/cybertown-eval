@@ -28,6 +28,9 @@ class Settings:
     LLM_BASE_URL: str = os.getenv("LLM_BASE_URL", "https://api.deepseek.com")
     LLM_TIMEOUT: int = int(os.getenv("LLM_TIMEOUT", "120"))
 
+    # 实验开关：on 使用 WorkingMemory/SQLite/Qdrant，off 完全禁用长期记忆
+    MEMORY_MODE: str = os.getenv("MEMORY_MODE", "on").strip().lower()
+
     # CORS配置
     CORS_ORIGINS = ["*"]  # 生产环境应限制具体域名
 
@@ -43,6 +46,7 @@ class Settings:
         print(f"   提供商: {cls.LLM_PROVIDER}")
         print(f"   模型: {cls.LLM_MODEL_ID}")
         print(f"   服务地址: {cls.LLM_BASE_URL}")
+        print(f"   记忆模式: {cls.MEMORY_MODE}")
         return True
 
 settings = Settings()

@@ -12,6 +12,8 @@ backend/memory_data/
 backend/test_memory/
 backend/logs/
 backend/server.local.*
+experiments/memory_*.log
+experiments/memory_backup*/
 backend_minimal/
 backend_original/
 godot_original/

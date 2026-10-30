@@ -1,0 +1,13 @@
+mode,npc,turn,query,latency_ms,memory_recall_count,fact_recall_success,affinity_before,affinity_after,request_failed,notes
+memory_on,李四,1,"你好，我叫小林，我正在做一个赛博小镇课程项目，请记住我的名字和项目名称。",,,,,,,
+memory_on,李四,2,"你还记得我的名字，以及我正在做什么项目吗？",,,,,,,
+memory_on,张三,1,"你主要负责什么？",,,,,,,
+memory_on,张三,2,"你能给我的赛博小镇项目一个建议吗？",,,,,,,
+memory_on,王五,1,"你主要负责什么？",,,,,,,
+memory_on,王五,2,"你能给我的赛博小镇项目一个建议吗？",,,,,,,
+memory_off,李四,1,"你好，我叫小林，我正在做一个赛博小镇课程项目，请记住我的名字和项目名称。",,,,,,,
+memory_off,李四,2,"你还记得我的名字，以及我正在做什么项目吗？",,,,,,,
+memory_off,张三,1,"你主要负责什么？",,,,,,,
+memory_off,张三,2,"你能给我的赛博小镇项目一个建议吗？",,,,,,,
+memory_off,王五,1,"你主要负责什么？",,,,,,,
+memory_off,王五,2,"你能给我的赛博小镇项目一个建议吗？",,,,,,,
