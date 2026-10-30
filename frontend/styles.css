@@ -4,3 +4,4 @@
 .map canvas{display:block;width:100%;cursor:crosshair;image-rendering:auto}
 .map-hint{position:absolute;left:14px;bottom:12px;color:#344054;background:#ffffffcc;backdrop-filter:blur(8px);border:1px solid #fff;border-radius:999px;padding:7px 10px;font-size:11px;font-weight:700;pointer-events:none}
 
+.map{aspect-ratio:auto;min-height:480px;background:#d8f4e6;overflow:hidden;position:relative}.map:before,.map:after{display:none}#townCanvas{display:block;width:100%;max-width:100%;border-radius:20px;cursor:crosshair}.map-hint{position:absolute;left:14px;bottom:12px;padding:7px 10px;border-radius:999px;background:rgba(16,24,40,.72);color:#fff;font-size:11px;pointer-events:none;backdrop-filter:blur(8px)}

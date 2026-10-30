@@ -47,6 +47,7 @@ function resizeCanvas() {
   view.cell = Math.max(38, Math.min(64, view.width / Math.max(10, (state?.width || 15) + 1)));
   view.height = (state?.height || 10) * view.cell;
   canvas.style.height = `${view.height}px`;
+  canvas.parentElement.style.height = `${view.height}px`;
   canvas.width = view.width * view.dpr;
   canvas.height = view.height * view.dpr;
   ctx.setTransform(view.dpr, 0, 0, view.dpr, 0, 0);
