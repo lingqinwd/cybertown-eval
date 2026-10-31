@@ -4,30 +4,38 @@ __pycache__/
 .env
 *.env
 *.backup
-backend_original/.env
-backend_original/memory_data/
-backend_original/test_memory/
-backend_original/logs/
+
+# 记忆与日志（本地产物，不提交）
 backend/memory_data/
 backend/test_memory/
 backend/logs/
 backend/logs/metrics_*.csv
 backend/server.local.*
+backend/aup-qwen-memory-*.log
 experiments/memory_*.log
 experiments/memory_backup*/
-backend_minimal/
+
+# 端侧实验产物
+.ipynb_checkpoints/
+serve_qwen.log
+qdrant_data/
+qdrant
+cloudflared
+
+# 上游/原型副本，不纳入最终项目
 backend_original/
+backend_original/.env
+backend_original/memory_data/
+backend_original/test_memory/
+backend_original/logs/
+backend_minimal/
 godot_original/
-prototype_minimal/
-*.zip
-prototype_minimal/.godot/
 godot_original/.godot/
+prototype_minimal/
+prototype_minimal/.godot/
+
+# 构建与临时产物
 godot/.godot/
 runs/
 results/
-
-# 实验运行产物
-.ipynb_checkpoints/
-serve_qwen.log
-backend/aup-qwen-memory-*.log
-backend/logs/
+*.zip

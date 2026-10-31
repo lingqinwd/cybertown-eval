@@ -1,107 +1,137 @@
-# CyberTown-EdgeCloud：面向可交互 AI NPC 的端云协同推理与记忆增强研究
+# CyberTown-EdgeCloud
 
-基于 Datawhale HelloAgents 第 15 章赛博小镇的端云协同 NPC 实验项目。
+**面向可交互 AI NPC 的端云协同推理与记忆增强研究**
 
-项目保留原始 Godot 4.5.2 像素办公室、玩家移动、NPC 巡逻和 E 键交互，只增加可测量的记忆、好感度和响应延迟信息，用来回答一个清晰的问题：
+基于 Datawhale HelloAgents 第 15 章赛博小镇。项目保留原始 Godot 4.5.2 像素办公室、玩家移动、NPC 巡逻和 E 键交互,只增加可测量的**记忆**、**好感度**和**响应延迟**,用来回答一个清晰的问题:
 
-> 在不同模型部署位置下，长期情景记忆能否提升 NPC 的跨轮对话一致性？它会带来多少响应延迟？
+> 在不同模型部署位置下,长期情景记忆能否提升 NPC 的跨轮对话一致性?它会带来多少响应延迟?
 
-## 当前工作副本
+## 核心结果
+
+2×2 消融,四组各 6 轮固定脚本、零请求失败。
+
+| 组 | 模型 | 部署位置 | 记忆 | 平均延迟 | 最快 | 最慢 | 跨轮召回 |
+|---|---|---|---:|---:|---:|---:|---:|
+| A | DeepSeek-chat | 云端 GPU | 关 | 1542 ms | 1297 | 2063 | 0% |
+| B | DeepSeek-chat | 云端 GPU | 开 | 4810 ms | 3630 | 7979 | **100%** |
+| C | Qwen2.5-1.5B | 端侧 R9700 | 关 | 861 ms † | 695 | 1108 | 0% |
+| D | Qwen2.5-1.5B | 端侧 R9700 | 开 | 1078 ms † | 803 | 1432 | **100%** |
+
+† Qwen 行为服务端耗时(不含网络);DeepSeek 仅有客户端端到端数据。完整口径说明见 [docs/EXPERIMENT_RESULTS.md](docs/EXPERIMENT_RESULTS.md)。
+
+### 三条结论
+
+**1. 功能上,记忆把跨轮召回从 0% 提到 100%,两种部署都成立。**
+
+**2. 代价上,云端是 3.12 倍,端侧只有 1.25 倍,绝对增量相差约 15 倍。**
+
+拆开看两者的开销来源完全不同:
+
+| 模型 | 回复字数 关 → 开 | 耗时 关 → 开 | 每字耗时 |
+|---|---|---|---:|
+| DeepSeek | 54.8 → 44.7(**−19%**) | +212% | 28.1 → 107.7 ms/字 |
+| Qwen | 65 → 79(+21.5%) | +25% | 13.2 → 13.6 ms/字 |
+
+端侧字多了、耗时按比例涨,**每字成本几乎不变**;云端字数反而变少、耗时却翻三倍,**增量根本不在生成环节**。这对应架构差异:云端每次检索要调远程 embedding 接口,端侧是本地计算。详见报告 §3.2。
+
+**3. 失效模式上,大模型诚实、小模型会编。**
+
+同样在无记忆状态下被追问,DeepSeek 说「我一时对不上号了」,而 Qwen2.5-1.5B 说「当然记得!你在做的是一个关于多智能体系统的研究吧?」—— 后者其实来自它自己的系统提示词示例,被误当成了对玩家的记忆。对 NPC 产品而言,自信的错误比诚实的遗忘更危险。
+
+## 目录结构
 
 ```text
-godot/   原始 Godot 2D 项目
-backend/ 原始 FastAPI + HelloAgents 后端
-experiments/      记忆消融实验
-docs/             设计和复现说明
+godot/        Godot 4.5.2 2D 客户端（场景、脚本、像素素材）
+backend/      FastAPI + HelloAgents：NPC Agent、记忆管理、好感度、日志
+experiments/  四组实验数据（逐轮延迟、服务端指标、对话日志）
+docs/         报告、架构、部署、排错、课堂汇报稿
+frontend/     网页版界面（早期原型，对照用）
+data/         世界配置
+patches/      hello-agents 中文检索修复补丁
+run_aup.sh    AUP 端侧实验启停脚本（自检/冒烟/归档）
+serve_qwen.py 本地 OpenAI 兼容服务（vLLM 在 ROCm 下不可用时的替代）
 ```
 
-`godot` 由教程原始项目复制而来，包含 `main.tscn`、`player.tscn`、`npc.tscn` 和 `dialogue_ui.tscn`。之前的简化原型保存在 `prototype_minimal/`，用于对照，不作为最终演示项目。
+## 两条运行路径
 
-## 项目结构
+**云端(DeepSeek)**:后端直连 API,最简配置。
 
-```text
-godot/       原始 Godot 4.5.2 2D 游戏客户端
-backend/     FastAPI、NPC Agent、DeepSeek 适配和记忆系统
-experiments/ 消融实验脚本、日志和 CSV 结果模板
-docs/        架构、实验设计、本地部署和 AUP 部署说明
-```
-
-## 模型配置与切换
-
-后端通过统一的 OpenAI 兼容接口切换 DeepSeek 云端模型和 AUP 本地小模型。复制配置模板：
-
-```powershell
+```bash
 cd backend
-Copy-Item .env.deepseek.example .env
-notepad .env
+cp .env.deepseek.example .env      # 填入 DEEPSEEK_API_KEY
+pip install -r requirements.txt
+python -m uvicorn main:app --port 8000
 ```
 
-在 `.env` 中填写本机密钥：
+**端侧(Qwen2.5-1.5B / ROCm)**:模型本地跑,接口仍走 OpenAI 兼容协议,后端代码不改。
 
-```dotenv
-LLM_PROVIDER=deepseek
-LLM_MODEL_ID=deepseek-chat
-LLM_API_KEY=你的DeepSeek密钥
-DEEPSEEK_API_KEY=你的DeepSeek密钥
-LLM_BASE_URL=https://api.deepseek.com
-MODEL_PROFILE=deepseek
+```bash
+python3 serve_qwen.py              # 起在 :8001
+bash run_aup.sh on                 # 自检 + 冒烟 + 启动后端 :8000
 ```
 
-AUP 小模型使用同一套 `/chat` 接口，只需把 `MODEL_PROFILE` 改为 `aup_local`，并填写 AUP 上 vLLM/Ollama 的 OpenAI 兼容地址。详见 [docs/MODEL_SWITCHING.md](docs/MODEL_SWITCHING.md)。
-
-Embedding 仍使用原有的 DashScope `text-embedding-v3`，因为本项目的长期记忆需要向量化接口；DeepSeek 负责 NPC 回复和好感度分析。`.env` 不得提交到 GitHub。
-
-## Godot 与后端地址
-
-Godot 默认连接本机：
-
-```text
-http://127.0.0.1:8000
-```
-
-如果以后使用 AUP 后端，可以在启动 Godot 前设置：
+Godot 端通过环境变量指定后端地址:
 
 ```powershell
-$env:CYBERTOWN_API_BASE_URL="https://你的AUP代理地址"
+$env:CYBERTOWN_API_BASE_URL="https://<你的后端地址>"
 ```
 
-这样不需要修改 Godot 场景或脚本。
+详细步骤见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md),模型切换见 [docs/MODEL_SWITCHING.md](docs/MODEL_SWITCHING.md)。
 
-完整的本地和 AUP 部署流程见 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)。
+## 文档索引
 
-## 实验设计
+| 文档 | 内容 |
+|---|---|
+| [docs/EXPERIMENT_RESULTS.md](docs/EXPERIMENT_RESULTS.md) | 四组完整结果、延迟归因、失效模式、局限 |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | 端侧部署踩过的 6 个坑与修复（强烈建议先读） |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 系统架构与实验开关 |
+| [docs/CLASS_PRESENTATION_3MIN.md](docs/CLASS_PRESENTATION_3MIN.md) | 3 分钟课堂汇报稿 |
+| [experiments/README.md](experiments/README.md) | 数据文件说明与口径 |
+| [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | 本地与 AUP 部署 |
+| [docs/MODEL_SWITCHING.md](docs/MODEL_SWITCHING.md) | 云端 / 端侧模型切换 |
 
-固定同一 NPC 和同一组问题，比较模型部署位置与记忆开关：
+## 复现要点
 
-| 条件 | 模型 | 工作/情景记忆 |
-|---|---|---:|
-| 1 | DeepSeek 云端 | 关闭 |
-| 2 | DeepSeek 云端 | 开启 |
-| 3 | AUP 本地小模型 | 关闭 |
-| 4 | AUP 本地小模型 | 开启 |
+**依赖锁定**(版本错一个,记忆系统就可能静默失效):
 
-记录平均、最快、最慢响应延迟，记忆召回次数，事实回忆成功率，好感度变化和请求失败次数。这样可以在不训练模型的情况下形成可复现的课程实验。
+```text
+torch 2.9.1+rocm7.13.0        # 系统自带，勿用 pip 覆盖成 CUDA 版
+qdrant-client==1.9.2          # 更高版本缺少 hello-agents 0.2.9 依赖的符号
+sentence-transformers 6.2.0
+transformers 5.19.0
+hello-agents 0.2.9
+qdrant server 1.20.0          # 单文件二进制，端口 6333
+```
 
-实验结果模板见 [experiments/results_template.csv](experiments/results_template.csv)。
-课堂汇报稿见 [docs/CLASS_PRESENTATION_3MIN.md](docs/CLASS_PRESENTATION_3MIN.md)。
+**必须设置的环境变量**(不设会导致记忆系统整体不可用,且报错信息误导):
 
-### 当前截图实验结果
+```bash
+export EMBED_MODEL_TYPE=local
+export QDRANT_URL=http://127.0.0.1:6333
+```
 
-基于 6 次唯一对话的客户端端到端耗时：
+**必须打的补丁**(中文检索在工作记忆里默认完全失效):
 
-| 模式 | 平均 | 最快 | 最慢 | 李四事实回忆 |
-|---|---:|---:|---:|---:|
-| 记忆模式 | 4810 ms | 3630 ms | 7979 ms | 1/1（100%） |
-| 基线模式 | 1542 ms | 1297 ms | 2063 ms | 0/1（0%） |
+```bash
+python3 patches/apply_working_memory_fix.py
+```
 
-记忆模式在当前小样本测试中平均多等待约 3268 ms，约为基线的 3.12 倍；代价换来跨轮事实回忆能力。该结果是一次课程实验样本，后续可增加重复次数以降低 DeepSeek 网络波动影响。原始截图数据分别保存在 `experiments/memory_on_screenshot_results.csv` 和 `experiments/memory_off_screenshot_results.csv`。
+**验证记忆是否真的生效**,不要看 `/npcs/{name}/memories` 接口(它对工作记忆恒返回空),要看服务端指标:
 
-后端运行时会在 `backend/logs/metrics_YYYY-MM-DD.csv` 写入每轮服务端耗时、记忆召回数、好感度前后值和失败状态；Godot 界面显示的是包含网络往返的客户端端到端耗时。两者分别用于分析后端处理开销和玩家实际等待时间。
+```bash
+curl -s -X POST http://127.0.0.1:8000/chat -H 'Content-Type: application/json' \
+  -d '{"npc_name":"李四","message":"我叫小林，请记住"}'
+curl -s "http://127.0.0.1:8000/npcs/李四/memories"        # 恒为 []，正常
+grep -c "已保存到" backend/logs/dialogue_$(date +%F).log   # 有输出才说明写入成功
+```
 
-## 开源注意事项
+## 已知问题
 
-- 保留 Datawhale HelloAgents 上游项目链接和致谢。
-- 不提交 `.env`、API Key、Qdrant 数据目录和个人对话日志。
-- 第三方图片、音频和字体按各自许可证使用。
+- 记忆仅存活于进程内(写入 `working` 记忆,不落盘),后端重启即清空
+- `MEMORY_MODE=off` 时每轮重建 Agent,因此基线连**同轮上下文**也不保留
+- 单组仅 6 轮、单次采样,延迟差异处于统计临界,详见报告 §4 局限
+- Qdrant 在本实验中并未真正参与检索,只是 `EpisodicMemory` 初始化的硬依赖
 
+## 许可与致谢
 
+MIT License。上游项目:[Datawhale HelloAgents](https://github.com/datawhalechina/hello-agents) 第 15 章。第三方图片、音频与字体按各自许可证使用。请勿提交 `.env`、API Key、`memory_data/`、`qdrant_data/` 与个人对话日志。
