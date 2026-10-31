@@ -1,0 +1,7 @@
+timestamp,model_profile,mode,npc,message,latency_ms,memory_recall_count,affinity_before,affinity_after,request_failed
+,aup_local,memory_off,李四,你好，我叫小林，我正在做一个赛博小镇课程项目，请记住我的名字和项目名称。,823.58,0,53.0,54.0,False
+,aup_local,memory_off,李四,你还记得我的名字，以及我正在做什么项目吗？,695.54,0,54.0,56.0,False
+,aup_local,memory_off,张三,你主要负责什么？,742.34,0,50.0,51.0,False
+,aup_local,memory_off,张三,你能给我的赛博小镇项目一个建议吗？,1107.51,0,51.0,53.0,False
+,aup_local,memory_off,王五,你主要负责什么？,637.1,0,50.0,51.0,False
+,aup_local,memory_off,王五,你能给我的赛博小镇项目一个建议吗？,1161.64,0,51.0,53.0,False

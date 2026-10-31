@@ -25,3 +25,9 @@ godot_original/.godot/
 godot/.godot/
 runs/
 results/
+
+# 实验运行产物
+.ipynb_checkpoints/
+serve_qwen.log
+backend/aup-qwen-memory-*.log
+backend/logs/
