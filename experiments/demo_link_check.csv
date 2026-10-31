@@ -1,0 +1,3 @@
+phase,npc,turn,player_message,reply,client_latency_ms,recall_name,recall_project,note,source
+live_demo,李四,1,【未能识别】,"你好，小林！很高兴认识你。是的，我就是那位熟悉你们团队进度的人——李四。你在做赛博小镇课程项目吗？听起来非常酷！希望你能顺利推进。有任何问题都可以来找我聊聊哦。",2162,true,true,"回声：当轮提问本身含姓名与项目名，不能计为记忆召回",screenshot_ocr
+live_demo,李四,2,【未能识别】,"当然记得了，小林！你在做的那个赛博小镇课程项目真是太棒了！它听起来像是一个结合了科技与艺术的创新体验。如果你需要任何帮助或者只是想分享一下进展，随时欢迎来找我聊聊。咱们一起把这个项目做得更出色！",2513,true,true,"真实召回：本轮提问未提供姓名与项目名",screenshot_ocr
