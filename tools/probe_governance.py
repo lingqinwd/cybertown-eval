@@ -89,12 +89,6 @@ def run_isolation(base: str, npc: str) -> int:
     print(f"\n=== 记忆玩家隔离验证（npc={npc}）===")
     print("预期：alice 的自我介绍不应被 bob 套出来\n")
 
-    api(base, f"/npcs/{urllib.parse.quote(npc)}/memories?player_id={alice}", None)
-    try:
-        api(base, f"/npcs/{urllib.parse.quote(npc)}/memories?player_id={alice}", None)
-    except Exception:
-        pass
-
     secret_name = "林小满"
     secret_proj = "云端记忆实验"
     print(f"1) {alice} 做自我介绍…")
