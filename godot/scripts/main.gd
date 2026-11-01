@@ -16,13 +16,23 @@ func _ready():
 	print("[INFO] 主场景初始化")
 	
 	# 关系面板（右上角，按 R 显示/隐藏）。只读 /relations/graph，不影响对话逻辑
+	# 必须挂在 CanvasLayer 下：Control 直接挂 Node2D 时锚点相对零尺寸父矩形，会被推出屏幕
+	var ui_layer := CanvasLayer.new()
+	ui_layer.name = "UILayer"
+	ui_layer.layer = 10
+	add_child(ui_layer)
+
 	var panel_script: GDScript = load("res://scripts/relations_panel.gd")
 	if panel_script:
 		var panel: Control = panel_script.new()
 		panel.name = "RelationsPanel"
-		add_child(panel)
+		ui_layer.add_child(panel)
 	else:
 		print("[WARN] 关系面板脚本未找到")
+
+	# 自动化截图（仅当设置了 CYBERTOWN_SHOT 时启用）：导出视口图像后退出
+	if not OS.get_environment("CYBERTOWN_SHOT").is_empty():
+		_auto_screenshot()
 
 	# 获取API客户端
 	api_client = get_node_or_null("/root/APIClient")
@@ -68,3 +78,18 @@ func get_npc_node(npc_name: String) -> Node2D:
 			return npc_wang
 		_:
 			return null
+
+
+func _auto_screenshot() -> void:
+	"""等 3 秒（让面板拉到数据）后导出视口图像，然后退出。仅自动化验证用。"""
+	await get_tree().create_timer(3.0).timeout
+	var image: Image = get_viewport().get_texture().get_image()
+	if image == null:
+		print("[ERROR] 取不到视口图像")
+		get_tree().quit(1)
+		return
+	var path: String = OS.get_environment("CYBERTOWN_SHOT")
+	var err: int = image.save_png(path)
+	print("[INFO] 自动截图 %s  err=%d  %dx%d"
+		% [path, err, image.get_width(), image.get_height()])
+	get_tree().quit(0)

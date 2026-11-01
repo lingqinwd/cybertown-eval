@@ -40,9 +40,9 @@ const TYPE_LABELS := {
 func _ready() -> void:
 	name = "RelationsPanel"
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	size = PANEL_SIZE
-	position = Vector2(-PANEL_SIZE.x - 14.0, 14.0)
+	# 直接按视口尺寸定位：锚点在 CanvasLayer/首帧下解析不确定，显式算更稳
+	_apply_layout()
+	get_viewport().size_changed.connect(_apply_layout)
 
 	_http = HTTPRequest.new()
 	_http.timeout = 5.0
@@ -50,7 +50,18 @@ func _ready() -> void:
 	_http.request_completed.connect(_on_request_completed)
 
 	print("[INFO] 关系面板已就绪（按 R 显示/隐藏）")
+	if Config.DEBUG_MODE:
+		print("[INFO] 关系面板 rect: ", get_global_rect(), " visible=", visible)
 	_refresh()
+
+
+func _apply_layout() -> void:
+	"""把面板钉在右上角：位置由视口尺寸算出来，不依赖锚点解析时机。"""
+	var vp: Vector2 = get_viewport_rect().size
+	if vp.x <= 0.0 or vp.y <= 0.0:
+		vp = Vector2(1280, 720)      # headless / 首帧兜底
+	size = PANEL_SIZE
+	position = Vector2(vp.x - PANEL_SIZE.x - 14.0, 14.0)
 
 
 func _process(delta: float) -> void:

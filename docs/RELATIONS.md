@@ -191,10 +191,45 @@ E:\Software\Godot\Godot-4.5.2\Godot_v4.5.2-stable_win64.exe --path E:\graduate_s
 |---|---|---|
 | 脚本能加载、无解析错误 | `godot --headless --path ... --quit` | 无 SCRIPT ERROR / Parse Error |
 | 面板随主场景创建 | 同一命令的 stdout | `[INFO] 关系面板已就绪（按 R 显示/隐藏）` |
-| 真实拉到数据 | 窗口模式运行 8 秒的 stdout | `[INFO] 关系面板刷新: 节点 3 · 边 3` × 2（间隔 5 秒） |
+| 真实拉到数据 | 窗口模式运行的 stdout | `[INFO] 关系面板刷新: 节点 3 · 边 3` × 2（间隔 5 秒） |
 | `_draw` 无运行时错误 | 窗口模式（真实渲染） | 0 条 SCRIPT ERROR |
-| **版式几何** | `tests/panel_layout_check.gd`（headless） | **全部通过**，见下 |
-| 观感（配色/字号顺眼） | 人工目视 | 待确认 |
+| **真的画在屏幕上** | 游戏自导出视口图像 + 像素统计 | 深色底占 49%；三个节点圆心采样均为 `RGB(76,140,242)`；蓝色像素 2262（≈3 个半径 16 的圆） |
+| **连线颜色** | 同上（面板区域计数） | 浅绿 1029 px、红 617 px、白字 718 px（橙 0 是因为当时没有「竞争」类型） |
+| **版式几何** | `tests/panel_layout_check.gd`（headless，两种视口） | 1280×720 与 1920×1080 下各 5 项全 PASS |
+
+面板截图（游戏自导出，1920×1080 里裁出 380×320）：
+
+![关系面板](images/relations_panel.png)
+
+### 一个真实的 bug：面板画在了屏幕外
+
+第一版把 `Control` 直接加到 `main`（`Node2D`）下，再 `set_anchors_preset(PRESET_TOP_RIGHT)`。
+**`Control` 的锚点是相对父 `Control` 的矩形算的；父节点是 `Node2D` 时父矩形为零尺寸，
+锚点退化，面板被推到屏幕左侧外面** —— 但日志一切正常（脚本加载、数据拉取、`_draw` 无错），
+肉眼却在游戏里找不到它。
+
+发现方式值得记：不是靠"看"，而是把游戏导出的视口图像按日志里的 `get_global_rect()`
+裁出来数像素 —— 那个区域 95.9% 是白的，说明面板根本不在那儿。
+
+修法两条一起上：
+
+1. `CanvasLayer` 承载 UI（`main.gd` 建一层 `UILayer`，面板挂在它下面）；
+2. 不再依赖锚点，`_apply_layout()` 直接按 `get_viewport_rect()` 算位置，并连
+   `get_viewport().size_changed` 以适配窗口缩放。
+
+### 自动化截图（无人值守验证 UI）
+
+设置环境变量即可让游戏自己导出**视口图像**再退出（分辨率与面板坐标都是确定的，
+不受 Windows DPI 缩放影响）：
+
+```powershell
+$env:CYBERTOWN_SHOT='E:\TempCache\panel_shot.png'
+E:\Software\Godot\Godot-4.5.2\Godot_v4.5.2-stable_win64_console.exe --path E:\graduate_student\AI\cybertown-eval\godot
+# 输出: [INFO] 自动截图 ... err=0 1920x1080
+```
+
+外部 `CopyFromScreen` 在本机不可靠：125% DPI 缩放下 .NET 报的是逻辑分辨率 1536×864，
+而游戏视口是 1920×1080，坐标对不上，裁剪必然错位。
 
 ### 版式几何自检
 
