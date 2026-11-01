@@ -9,9 +9,9 @@
 
 | # | 机制 | 状态 | 证据 |
 |---|---|:--:|---|
-| 1 | 权威世界状态机 | 🟡 **规则与动作层已落地** | 新增 `backend/world_state.py`（金币/物品/任务的权威容器，含审计事件）与 `backend/actions.py`（动作白名单 + 前置校验，`grant_gold` 等直接拒绝）；`tests/test_world_state.py` 16 个单测。**已接入对话主循环**：模型用 `<<ACTION {json}>>` 单行提议动作，后端解析后交给 `actions.apply_action` 校验，通过才生效；标记会从给玩家看的回复里剥掉。开关 `ACTION_PROPOSAL`（默认 off，保证已有实验可复现），已在本地 DeepSeek 上验证通过 |
+| 1 | 权威世界状态机 | ✅ **已落地** | `backend/world_state.py`（金币/物品/任务/**位置**/地图尺寸，含审计事件）+ `backend/actions.py`（动作白名单 + 前置校验，`grant_gold` 直接 `forbidden`）；关卡数据改由 `data/world.json` 驱动（缺失时回退内置默认值）；位置由客户端拥有、后端做**边界 + 单步距离**校验（`POST /world/position`，瞬移与越界都留审计）；单测 16 + 20 个 |
 | 2 | 可追溯记忆 | 🟡 部分 | 有 `importance` 与 `metadata{speaker,player_id,session_id,timestamp,affinity,sentiment}`；**缺** `credibility`、合并/纠正/遗忘 API；跨玩家隔离已于治理层修复（见 [GOVERNANCE.md](GOVERNANCE.md)） |
-| 3 | 社会关系图谱 | ❌ 不存在 | 关系只有 NPC↔玩家的一维好感度；无 NPC↔NPC 关系、无事件流、Godot 侧无关系网络 UI |
+| 3 | 社会关系图谱 | 🟡 **后端完成，UI 待做** | `backend/relations.py`（3 个 NPC = 3 条边，强度 −1…1，类型由强度派生，7 种事件规则，证据链最近 20 条）+ `backend/graph_store.py`（Neo4j 可选镜像，已验证写入/读回 3 节点 3 边）+ 6 个 REST 端点；场景可经 `relation_event` 驱动演化（`scenarios/rivalry.yaml` 实测）。**缺 Godot 关系面板** |
 | 4 | 可重复实验场景 | ❌ 不存在 | 代码中无 `scenario / event` 概念；2×2 消融是一次性脚本（`browser_turns.js` + `docs/EXPERIMENT_RESULTS.md`），不是平台能力 |
 
 **一个必须点明的反例**：好感度原本是"由 LLM 直接修改的状态"，这正是机制 1 想禁止的模式，

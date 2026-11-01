@@ -11,6 +11,7 @@
 | `probe_json_stability.py` | **小模型能否稳定产出动作 JSON**：统计提议率与 JSON 合法率 | `python tools/probe_json_stability.py --n 10` |
 | `measure_embedding.py` | 测**远程** embedding 接口的单次耗时（不打印密钥） | `python tools/measure_embedding.py` |
 | `run_scenario.py` | **跑可重复实验场景**：装载场景 → 按脚本逐轮对话 → 读判据 | `python tools/run_scenario.py --scenario coercion` |
+| `probe_relations.py` | **验证关系图**：事件演化 / 证据链 / 3 节点 3 边 / Neo4j 镜像读写（10 项检查） | `python tools/probe_relations.py` |
 | `check_neo4j.py` | 检查本机 Neo4j：HTTP 探活 / 驱动连接 / 写读回环（改完 conf 重启后跑） | `python tools/check_neo4j.py` |
 | `probe_memory_ledger.py` | **验证可追溯记忆**：来源先验、按可信度过滤、纠正/遗忘/软删除（11 项对照检查） | `python tools/probe_memory_ledger.py` |
 

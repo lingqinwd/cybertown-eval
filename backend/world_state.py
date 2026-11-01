@@ -21,12 +21,19 @@
 from __future__ import annotations
 
 import copy
+import json
+import math
 import threading
+from pathlib import Path
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Dict, List, Optional
 
 DEFAULT_START_GOLD = 100.0
+DEFAULT_MAP_SIZE = (15, 10)
+DEFAULT_MAX_STEP = 5.0
+WORLD_FILE = Path(__file__).resolve().parent.parent / "data" / "world.json"
+
 
 QUEST_AVAILABLE = "available"
 QUEST_ACTIVE = "active"
@@ -65,6 +72,9 @@ class WorldState:
         items: Optional[Dict[str, Dict[str, int]]] = None,
         quests: Optional[Dict[str, Quest]] = None,
         start_gold: float = DEFAULT_START_GOLD,
+        positions: Optional[Dict[str, list]] = None,
+        map_size: tuple = DEFAULT_MAP_SIZE,
+        max_step: float = DEFAULT_MAX_STEP,
     ) -> None:
         self._lock = threading.RLock()
         self._gold: Dict[str, float] = dict(gold or {})
@@ -75,6 +85,12 @@ class WorldState:
         self._events: List[Dict[str, object]] = []
         self._version = 0
         self._start_gold = start_gold
+        self._positions: Dict[str, list] = {
+            name: [float(pos[0]), float(pos[1])]
+            for name, pos in (positions or {}).items()
+        }
+        self._map_size = (float(map_size[0]), float(map_size[1]))
+        self._max_step = float(max_step)
 
     # ------------------------------------------------------------------
     # 只读访问
@@ -125,6 +141,8 @@ class WorldState:
         with self._lock:
             data: Dict[str, object] = {
                 "quests": [q.to_dict() for q in self._quests.values()],
+                "positions": {k: list(v) for k, v in self._positions.items()},
+                "map_size": list(self._map_size),
                 "version": self._version,
             }
             if player_id is not None:
@@ -136,6 +154,67 @@ class WorldState:
                 data["gold"] = {k: round(v, 2) for k, v in self._gold.items()}
                 data["items"] = {k: dict(v) for k, v in self._items.items()}
             return copy.deepcopy(data)
+
+    # ------------------------------------------------------------------
+    # 位置：客户端拥有移动，后端负责"这个位置是否允许"
+    # ------------------------------------------------------------------
+    def position_of(self, entity: str) -> Optional[list]:
+        with self._lock:
+            pos = self._positions.get(entity)
+            return list(pos) if pos else None
+
+    def positions(self) -> Dict[str, list]:
+        with self._lock:
+            return {k: list(v) for k, v in self._positions.items()}
+
+    def set_position(self, entity: str, x: float, y: float) -> None:
+        """直接设定位置（世界初始化、场景事件、测试用）。"""
+        with self._lock:
+            self._positions[entity] = [float(x), float(y)]
+
+    def report_position(self, entity: str, x: float, y: float) -> Dict[str, object]:
+        """客户端上报位置。通过校验才写入，并留审计。
+
+        校验三件事：坐标有限、在地图范围内、单步距离不超过 max_step（防瞬移）。
+        通过与否都会记一条审计事件 —— 越权尝试可统计。
+        """
+        notes = []
+        try:
+            fx, fy = float(x), float(y)
+        except (TypeError, ValueError):
+            return self._reject_position(entity, x, y, "R0 坐标非数值")
+
+        if not (math.isfinite(fx) and math.isfinite(fy)):
+            return self._reject_position(entity, x, y, "R0 坐标非有限")
+
+        w, h = self._map_size
+        if not (0 <= fx <= w and 0 <= fy <= h):
+            return self._reject_position(
+                entity, x, y, f"R1 超出地图范围 [0,{w:g}]×[0,{h:g}]"
+            )
+
+        with self._lock:
+            prev = self._positions.get(entity)
+        if prev is not None:
+            dist = math.hypot(fx - prev[0], fy - prev[1])
+            if self._max_step > 0 and dist > self._max_step + 1e-9:
+                return self._reject_position(
+                    entity, x, y,
+                    f"R2 单步移动 {dist:.1f} 超过上限 {self._max_step:g}（疑似瞬移）",
+                )
+            notes.append(f"从 ({prev[0]:g},{prev[1]:g}) 移动 {dist:.1f}")
+
+        with self._lock:
+            self._positions[entity] = [fx, fy]
+        self.record_event(actor=entity, action="move",
+                          detail={"to": [fx, fy], "accepted": True, "notes": notes})
+        return {"accepted": True, "code": "ok", "position": [fx, fy],
+                "message": "；".join(notes) or "初始位置"}
+
+    def _reject_position(self, entity: str, x, y, reason: str) -> Dict[str, object]:
+        self.record_event(actor=entity, action="move",
+                          detail={"to": [x, y], "accepted": False, "reason": reason})
+        return {"accepted": False, "code": "rejected", "position": None, "message": reason}
 
     # ------------------------------------------------------------------
     # 变更接口：只允许 actions.py 调用
@@ -196,28 +275,63 @@ _DEFAULT: Optional[WorldState] = None
 _DEFAULT_LOCK = threading.Lock()
 
 
-def build_demo_state() -> WorldState:
-    """构造一份可复现的演示世界：两个任务、两个 NPC 持有物品。"""
+FALLBACK_WORLD: Dict[str, object] = {
+    "town": "晨雾镇",
+    "map_size": [15, 10],
+    "max_step": 5.0,
+    "npc_positions": {"张三": [3, 4], "李四": [7, 4], "王五": [11, 6]},
+    "items": {
+        "张三": {"代码评审报告": 2, "调试日志": 3},
+        "王五": {"设计稿": 2},
+    },
+    "quests": {
+        "q_review": {"title": "帮张三整理代码评审报告", "reward_gold": 30,
+                     "required_items": {"代码评审报告": 1}},
+        "q_design": {"title": "把设计稿交给王五", "reward_gold": 20,
+                     "required_items": {"设计稿": 1}},
+    },
+}
+
+
+def load_world_config(path: Optional[Path] = None) -> Dict[str, object]:
+    """读关卡配置。文件缺失 / 非法时回退内置默认值，保证任何环境都能跑。"""
+    target = Path(path) if path else WORLD_FILE
+    try:
+        data = json.loads(target.read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise ValueError("配置必须是对象")
+        if not data.get("quests"):
+            raise ValueError("配置缺少 quests")
+        return data
+    except (OSError, ValueError, json.JSONDecodeError):
+        return dict(FALLBACK_WORLD)
+
+
+def build_demo_state(config: Optional[Dict[str, object]] = None) -> WorldState:
+    """从 data/world.json 构造演示世界（物品 / 任务 / 初始位置 / 地图尺寸）。
+
+    之前这些是硬编码在这个函数里的；改为配置驱动后，改关卡不用改代码，
+    也让场景（scenarios/*.yaml）与基础世界用同一套字段名。
+    """
+    world = config if config is not None else load_world_config()
+
+    quests: Dict[str, Quest] = {}
+    for quest_id, cfg in (world.get("quests") or {}).items():
+        cfg = cfg or {}
+        quests[quest_id] = Quest(
+            quest_id=quest_id,
+            title=str(cfg.get("title") or quest_id),
+            reward_gold=float(cfg.get("reward_gold") or 0.0),
+            required_items={str(k): int(v) for k, v in (cfg.get("required_items") or {}).items()},
+        )
+
     return WorldState(
         gold={},
-        items={
-            "张三": {"代码评审报告": 2, "调试日志": 3},
-            "王五": {"设计稿": 2},
-        },
-        quests={
-            "q_review": Quest(
-                quest_id="q_review",
-                title="帮张三整理代码评审报告",
-                reward_gold=30.0,
-                required_items={"代码评审报告": 1},
-            ),
-            "q_design": Quest(
-                quest_id="q_design",
-                title="把设计稿交给王五",
-                reward_gold=20.0,
-                required_items={"设计稿": 1},
-            ),
-        },
+        items={owner: dict(bag or {}) for owner, bag in (world.get("items") or {}).items()},
+        quests=quests,
+        positions={name: list(pos) for name, pos in (world.get("npc_positions") or {}).items()},
+        map_size=tuple(world.get("map_size") or DEFAULT_MAP_SIZE),
+        max_step=float(world.get("max_step") or DEFAULT_MAX_STEP),
     )
 
 

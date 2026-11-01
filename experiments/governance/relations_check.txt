@@ -1,0 +1,16 @@
+
+=== 关系图验证 ===
+后端 http://127.0.0.1:8000   观察对: 张三 ↔ 王五
+
+  [PASS] 复位后全部中立  类型: ['neutral', 'neutral', 'neutral']
+  [PASS] compete → 强度 -0.30 / rival
+  [PASS] conflict → 强度 -0.70 / conflict
+  [PASS] 两次负面事件后类型为 conflict 或 rival  当前 conflict
+  [PASS] help → 强度 -0.40 / rival
+  [PASS] help 后强度回升  -0.70 → -0.40
+  [PASS] 证据链累计 3 条  实际 3
+  [PASS] graph 有 3 节点 3 边  3 节点 / 3 边
+  [PASS] Neo4j 写入成功  nodes=3 edges=3
+  [PASS] Neo4j 读回图非空  读回 3 条边 / 3 个节点
+
+[PASS] 关系图与镜像检查全部通过

@@ -35,6 +35,7 @@ flowchart LR
 |---|---|---|---|
 | 好感度 | `backend/rules.py` | 后端规则 R0–R4（有限性、单轮上下限、正向需情感证据、0–100 边界） | 只能给出一个变化量提议，被裁剪或拒绝都记进 CSV |
 | 世界状态 | `backend/world_state.py` | 只有 `actions.py` 能写 | 只能用 `<<ACTION {json}>>` 提议白名单内的动作；`grant_gold` 等直接 `forbidden` |
+| 位置 | `backend/world_state.py` | 客户端拥有移动，后端裁决「是否允许」 | 上报越界或单步超过 `max_step`（默认 5）一律拒绝并留审计 |
 | 记忆 | `backend/agents.py` | 按 `(NPC, 玩家)` 二元组隔离 | 无法跨玩家读取；检索与写入都按该键归属 |
 
 动作白名单（`backend/actions.py`）：

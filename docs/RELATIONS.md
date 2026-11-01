@@ -90,7 +90,17 @@
 本机 Neo4j 是 `E:\Software\neo4j\neo4j-community-4.4.46` 的 **Windows 服务**。
 4.4 起用户凭据存在 `data\databases\system` 库里（哈希），**密码无法找回**，只能重置或关闭认证。
 
-这里选的是**关闭认证**（仅本机开发）：
+这里选的是**关闭认证**（仅本机开发），**已完成并验证**（2026-11-01）：
+
+| 检查 | 结果 |
+|---|---|
+| Neo4j 版本 | 4.4.46 community（Windows 服务） |
+| 驱动版本 | `neo4j` 6.4.1（与 4.4 兼容，实测可连） |
+| 无凭据 HTTP | 200（认证已关闭） |
+| 写读回环 | 通过 |
+| 关系图镜像 | **3 节点 / 3 边** 写入成功，读回一致 |
+
+执行步骤（留档）：
 
 ```powershell
 # 1) 已改好：conf 第 27 行取消注释
@@ -118,6 +128,23 @@ UNWIND $nodes AS n MERGE (x:NPC {id:n.id}) SET x.label = n.label
 UNWIND $edges AS e MATCH (a:NPC {id:e.a}) MATCH (b:NPC {id:e.b})
 MERGE (a)-[r:RELATES]->(b) SET r.strength=e.strength, r.type=e.type, r.updated_at=e.updated_at
 ```
+
+## 验证证据
+
+`tools/probe_relations.py` 一次跑出 10 项检查，全部通过：
+
+```
+[PASS] 复位后全部中立
+[PASS] compete → 强度 -0.30 / rival
+[PASS] conflict → 强度 -0.70 / conflict
+[PASS] help → 强度 -0.40 / rival（回暖）
+[PASS] 证据链累计 3 条
+[PASS] graph 有 3 节点 3 边
+[PASS] Neo4j 写入成功  nodes=3 edges=3
+[PASS] Neo4j 读回图非空（3 条边 / 3 个节点）
+```
+
+原始输出：`experiments/governance/relations_check.txt`
 
 ## 边界（不假装）
 

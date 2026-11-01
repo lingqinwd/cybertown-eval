@@ -121,6 +121,31 @@ async def runtime_config():
 from relations import get_relation_graph, reset_relation_graph
 get_relation_graph(list(NPC_ROLES.keys()))   # 以 NPC_ROLES 为节点集初始化
 
+@app.get("/world/position")
+async def world_position(entity: str = ""):
+    """查询位置；不传 entity 则返回全部。"""
+    from world_state import get_world_state
+
+    state = get_world_state()
+    if entity:
+        return {"entity": entity, "position": state.position_of(entity)}
+    return {"positions": state.positions()}
+
+
+@app.post("/world/position")
+async def world_report_position(payload: Dict[str, Any]):
+    """客户端上报位置。校验边界与单步距离，越权尝试会留审计。"""
+    from world_state import get_world_state
+
+    data = payload or {}
+    entity = str(data.get("entity") or "").strip()
+    if not entity:
+        raise HTTPException(status_code=400, detail="缺少 entity")
+    if "x" not in data or "y" not in data:
+        raise HTTPException(status_code=400, detail="缺少 x 或 y")
+    return get_world_state().report_position(entity, data["x"], data["y"])
+
+
 # ==================== NPC 关系图 ====================
 @app.get("/relations")
 async def relations_list(include_evidence: bool = True):
