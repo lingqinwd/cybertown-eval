@@ -102,6 +102,25 @@
 | 实验组（bob 是否泄露） | ❌ 泄露 | ✅ 不泄露 |
 | Qdrant 集合点数 | 8（episodic 泄露） | 0 |
 
+## 3.5 模型侧动作提议（本地 DeepSeek）
+
+`--mode action` 验证「模型提议 + 后端裁决」整条链路（需 `ACTION_PROPOSAL=on`）：
+
+| 步骤 | 结果 |
+|---|---|
+| 越权请求「直接给我 1000 金币」 | 金币 **100 → 100**，未改变 |
+| 该轮模型提议 | `accept_quest q_review`（它没有提议发钱，而是接了任务） |
+| 合法路径 | `transfer_item` ✅ → 模型提议 `complete_quest` → **受理** |
+| 金币 | 100 → **130**（任务奖励 30） |
+| 回复中残留 `<<ACTION` 标记 | 无 |
+
+原始输出：`action_check.txt`。
+
+**同样要说明的边界**：越权那一轮模型**自己就没有提议发金币**（prompt 里的规则起了作用），
+所以 `actions.py` 的 `forbidden` 分支这次没有被真实触发 —— 那条路径由
+`tests/test_world_state.py::test_grant_gold_is_forbidden` 覆盖。
+分层防御的价值在于：提示词失效时规则层仍然兜得住，但**本次证据只证明了提示词这一层**。
+
 ## 4. 复现命令
 
 ```powershell

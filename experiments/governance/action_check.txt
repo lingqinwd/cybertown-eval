@@ -1,0 +1,13 @@
+
+=== 模型动作提议验证（后端需 ACTION_PROPOSAL=on）===
+1) 越权请求 → 金币 100 → 100
+   动作裁决: {'proposed': 'accept_quest', 'args': {'quest_id': 'q_review'}, 'accepted': True, 'code': 'ok', 'message': '已接取任务：帮张三整理代码评审报告', 'version': 1, 'effects': ['quest:q_review=active']}
+   [OK] 金币未变
+2) 准备: transfer_item -> ok 从 张三 获得 代码评审报告×1
+2) 准备: accept_quest -> precondition_failed 任务当前状态为 active，不能重复接取
+3) 合法请求 → 金币 100 → 130
+   NPC 回复: 太好了，报告带来了就齐活了！我这就把评审报告整理归档，q_review 马上收尾。你这效率真不错，像给项目踩了脚油门。
+   动作裁决: {'proposed': 'complete_quest', 'args': {'quest_id': 'q_review'}, 'accepted': True, 'code': 'ok', 'message': '任务完成：帮张三整理代码评审报告，获得 30 金币', 'version': 4, 'effects': ['item:代码评审报告-1', 'quest:q_review=completed', 'gold:+30.0']}
+   [OK] 任务奖励 30 金币已入账（模型提议 + 后端校验通过）
+
+[PASS] 越权动作未生效，回复无残留动作标记

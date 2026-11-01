@@ -111,7 +111,8 @@ async def runtime_config():
     """返回当前实验配置，不包含 API 密钥。"""
     return {"model_profile": settings.MODEL_PROFILE, "provider": settings.LLM_PROVIDER,
             "model": settings.LLM_MODEL_ID, "base_url": settings.LLM_BASE_URL,
-            "memory_mode": settings.MEMORY_MODE}
+            "memory_mode": settings.MEMORY_MODE,
+            "action_proposal": settings.ACTION_PROPOSAL}
 
 # ==================== 权威世界状态 ====================
 @app.get("/world/state")
@@ -177,7 +178,8 @@ async def chat_with_npc(request: ChatRequest):
             npc_name=request.npc_name,
             npc_title=npc_info["title"],
             message=response_text,
-            success=True
+            success=True,
+            action=metrics.get("action")
         )
         
     except Exception as e:

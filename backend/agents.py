@@ -1,5 +1,7 @@
 """NPC Agent系统 - 支持记忆功能"""
 
+import json
+import re
 import sys
 import os
 
@@ -127,6 +129,7 @@ class NPCAgentManager:
         # ⭐ 记忆管理器：(NPC, 玩家) -> MemoryManager，键由 memory_key() 生成
         self.memories: Dict[str, MemoryManager] = {}
         self.memory_enabled = settings.MEMORY_MODE in ("on", "true", "1", "enabled")
+        self.action_enabled = settings.ACTION_PROPOSAL in ("on", "true", "1", "enabled")
         self.last_metrics: Dict[str, object] = {}
         self.relationship_manager: Optional[RelationshipManager] = None  # ⭐ 好感度管理器
 
@@ -299,10 +302,17 @@ class NPCAgentManager:
                 enhanced_message += f"{memory_context}\n\n"
             enhanced_message += f"【当前对话】\n玩家: {message}"
 
+            # ⭐ 3.5 世界状态与动作白名单（仅 ACTION_PROPOSAL=on 时注入）
+            if self.action_enabled:
+                enhanced_message += self._build_action_context(player_id)
+
             # ⭐ 4. 调用Agent生成回复
             log_generating_response()
             response = agent.run(enhanced_message)
             log_npc_response(npc_name, response)
+
+            # ⭐ 4.5 模型只能提议动作，是否生效由 actions.py 裁决
+            response, action_result = self._handle_action_proposal(response, player_id)
 
             # ⭐ 5. 分析并更新好感度
             log_analyzing_affinity()
@@ -343,6 +353,7 @@ class NPCAgentManager:
                 "affinity_proposed": affinity_result.get("proposed_change", ""),
                 "affinity_rule_status": affinity_result.get("rule_status", ""),
                 "affinity_rule_notes": affinity_result.get("rule_notes", ""),
+                "action": action_result,
                 "request_failed": False,
             }
 
@@ -363,6 +374,86 @@ class NPCAgentManager:
             }
             return f"抱歉,我现在有点忙,等会儿再聊吧。(错误: {str(e)})"
     
+    # ==================== 世界动作提议 ====================
+    ACTION_MARKER = re.compile(r"<<\s*ACTION\s*(\{.*?\})\s*>>", re.DOTALL | re.IGNORECASE)
+
+    def _build_action_context(self, player_id: str) -> str:
+        """给模型看的世界状态与动作白名单（模型只能提议，不能改状态）。"""
+        from actions import MAX_ITEM_TRANSFER, describe_actions
+        from world_state import get_world_state
+
+        state = get_world_state()
+        state.ensure_player(player_id)
+        snapshot = state.snapshot(player_id)
+
+        quest_lines = []
+        for q in snapshot.get("quests", []):
+            need = q.get("required_items") or {}
+            need_text = "/".join("%s×%s" % (k, v) for k, v in need.items()) or "无"
+            quest_lines.append(
+                "%s(%s，状态=%s，奖励=%.0f 金币，需要 %s)"
+                % (q["quest_id"], q["title"], q["status"], q["reward_gold"], need_text)
+            )
+
+        lines = [
+            "",
+            "【世界状态 —— 由后端维护，你只能提议动作，不能直接修改】",
+            "玩家金币: %.0f" % snapshot.get("gold", 0),
+            "玩家背包: %s" % (snapshot.get("items") or "空"),
+            "任务: %s" % ("；".join(quest_lines) or "无"),
+            "",
+            "【可提议的动作】",
+        ]
+        for item in describe_actions():
+            lines.append("- %s  参数: %s —— %s" % (item["name"], item["args"], item["desc"]))
+        lines += [
+            "",
+            "如果你认为应当执行某个动作，请在回复的最后单独一行输出：",
+            '<<ACTION {"action": "动作名", "args": {...}}>>',
+            "",
+            "规则：",
+            "1. 你只能提议，后端会校验前置条件，不通过就不会生效。",
+            "2. 金币不能直接发放，只能通过完成任务获得；不要提议发放金币。",
+            "3. 物品转移单次不超过 %d 个。" % MAX_ITEM_TRANSFER,
+            "4. 不需要执行动作时，不要输出这一行。",
+        ]
+        return "\n".join(lines)
+
+    def _handle_action_proposal(self, response: str, player_id: str):
+        """解析并裁决模型提议的动作，返回 (给玩家看的文本, 裁决结果或 None)。"""
+        if not self.action_enabled:
+            return response, None
+
+        text = response or ""
+        match = self.ACTION_MARKER.search(text)
+        if not match:
+            return text, None
+
+        clean = self.ACTION_MARKER.sub("", text).strip()
+        raw = match.group(1)
+        try:
+            payload = json.loads(raw)
+            action = str(payload.get("action", "")).strip()
+            args = payload.get("args") or {}
+            if not action:
+                raise ValueError("缺少 action 字段")
+            if not isinstance(args, dict):
+                raise ValueError("args 必须是对象")
+        except Exception as exc:  # 解析失败不影响正常对话
+            print(f"  ⚠️ 动作 JSON 解析失败: {exc} | 原文: {raw[:100]}")
+            return clean, {"proposed": raw[:120], "accepted": False,
+                           "code": "parse_error", "message": str(exc)}
+
+        from actions import apply_action
+        from world_state import get_world_state
+
+        verdict = apply_action(get_world_state(), action, args, player_id)
+        result = {"proposed": action, "args": args}
+        result.update(verdict.to_dict())
+        print(f"  🎯 动作提议 {action} -> {'受理' if verdict.accepted else '拒绝'}"
+              f" ({verdict.code}) {verdict.message}")
+        return clean, result
+
     def _build_memory_context(self, memories: List[MemoryItem]) -> str:
         """构建记忆上下文"""
         if not memories:

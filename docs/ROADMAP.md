@@ -9,7 +9,7 @@
 
 | # | 机制 | 状态 | 证据 |
 |---|---|:--:|---|
-| 1 | 权威世界状态机 | 🟡 **规则与动作层已落地** | 新增 `backend/world_state.py`（金币/物品/任务的权威容器，含审计事件）与 `backend/actions.py`（动作白名单 + 前置校验，`grant_gold` 等直接拒绝）；`tests/test_world_state.py` 16 个单测。**未完成**：LLM 输出动作的结构化解析，状态也尚未接进对话主循环 |
+| 1 | 权威世界状态机 | 🟡 **规则与动作层已落地** | 新增 `backend/world_state.py`（金币/物品/任务的权威容器，含审计事件）与 `backend/actions.py`（动作白名单 + 前置校验，`grant_gold` 等直接拒绝）；`tests/test_world_state.py` 16 个单测。**已接入对话主循环**：模型用 `<<ACTION {json}>>` 单行提议动作，后端解析后交给 `actions.apply_action` 校验，通过才生效；标记会从给玩家看的回复里剥掉。开关 `ACTION_PROPOSAL`（默认 off，保证已有实验可复现），已在本地 DeepSeek 上验证通过 |
 | 2 | 可追溯记忆 | 🟡 部分 | 有 `importance` 与 `metadata{speaker,player_id,session_id,timestamp,affinity,sentiment}`；**缺** `credibility`、合并/纠正/遗忘 API；跨玩家隔离已于治理层修复（见 [GOVERNANCE.md](GOVERNANCE.md)） |
 | 3 | 社会关系图谱 | ❌ 不存在 | 关系只有 NPC↔玩家的一维好感度；无 NPC↔NPC 关系、无事件流、Godot 侧无关系网络 UI |
 | 4 | 可重复实验场景 | ❌ 不存在 | 代码中无 `scenario / event` 概念；2×2 消融是一次性脚本（`browser_turns.js` + `docs/EXPERIMENT_RESULTS.md`），不是平台能力 |
@@ -161,8 +161,7 @@
 4. ⬜ 记忆的多玩家/多来源回归测试
 
 > 阶段一已完成的三项都由纯 Python 单测覆盖，不需要模型、网络或 GPU。
-> 尚未验证的是"模型能否稳定地生成合法动作 JSON"—— 1.5B 模型在这一步容易格式出错，
-> 这属于阶段二的第一件事。
+> 模型侧的结构化动作提议已在**本地 DeepSeek** 上端到端验证（`experiments/governance/action_check.txt`）：越权请求未改变金币，合法请求经校验后正确入账 30 金币。**尚未验证**的是 Qwen2.5-1.5B 能否稳定产出合法 JSON —— 1.5B 在这一步容易格式出错，需要真实 GPU 环境再测一轮。
 
 **阶段二（需要 GPU 与实验预算）**
 

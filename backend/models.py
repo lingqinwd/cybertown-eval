@@ -25,6 +25,9 @@ class ChatResponse(BaseModel):
     npc_title: str = Field(..., description="NPC职位")
     message: str = Field(..., description="NPC回复")
     success: bool = Field(default=True, description="是否成功")
+    action: Optional[Dict[str, Any]] = Field(
+        default=None, description="模型提议的世界动作及裁决结果（ACTION_PROPOSAL=on 时才有）"
+    )
     timestamp: Optional[datetime] = Field(default_factory=datetime.now, description="时间戳")
     
     class Config:

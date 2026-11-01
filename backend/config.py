@@ -33,6 +33,10 @@ class Settings:
     # 实验开关：on 使用 WorkingMemory/SQLite/Qdrant，off 完全禁用长期记忆
     MEMORY_MODE: str = os.getenv("MEMORY_MODE", "on").strip().lower()
 
+    # 实验开关：允许模型在回复里附带世界动作提议（提议必须经 actions.py 校验）
+    # 默认 off，保证已有实验的 prompt 与行为可复现
+    ACTION_PROPOSAL: str = os.getenv("ACTION_PROPOSAL", "off").strip().lower()
+
     # CORS配置
     CORS_ORIGINS = ["*"]  # 生产环境应限制具体域名
 
