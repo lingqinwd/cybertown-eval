@@ -14,6 +14,9 @@
 | `aup_qwen_memory_on_metrics.csv` | D 端侧·有记忆 | 后端 | 同上 |
 | `aup_qwen_memory_on_dialogue.log` | D | 后端 | 逐轮对话、检索到的记忆原文、好感度变化原因 |
 | `results_template.csv` | — | — | 空白模板 |
+| `matrix_local_qwen1.5b.csv` | 本地复现（off/on × 2 次） | 服务端 | A-B-B-A 交错 24 轮的客户端/服务端延迟、召回数、回复原文 |
+| `matrix_local_qwen1.5b.txt` | 同上 | 控制台 | 逐轮明细与汇总（倍数 3.75×） |
+| `MATRIX_REPLICATION.md` | 同上 | — | **本地复现的设计、结果、预测被推翻的原因与边界** |
 
 > 端侧(C/D)的**客户端端到端延迟**单独保存在 `.turns.csv` 中,由浏览器控制台脚本导出,未纳入本仓库。如需完整重跑,脚本思路见 [../docs/EXPERIMENT_RESULTS.md](../docs/EXPERIMENT_RESULTS.md) §1。
 
