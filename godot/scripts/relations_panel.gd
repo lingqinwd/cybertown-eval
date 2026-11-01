@@ -116,14 +116,10 @@ func _draw() -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COLOR_TEXT)
 		return
 
-	# 环形布局
-	var center := Vector2(PANEL_SIZE.x * 0.5, PANEL_SIZE.y * 0.48)
-	var radius: float = min(PANEL_SIZE.x, PANEL_SIZE.y) * 0.30
-	var positions := {}
+	var ids: Array = []
 	for i in count:
-		var angle: float = -PI * 0.5 + TAU * float(i) / float(count)
-		var id: String = _nodes[i].get("id", str(i))
-		positions[id] = center + Vector2(cos(angle), sin(angle)) * radius
+		ids.append(_nodes[i].get("id", str(i)))
+	var positions: Dictionary = layout_positions(ids, PANEL_SIZE)
 
 	# 先画边
 	for edge in _edges:
@@ -153,3 +149,24 @@ func _draw() -> void:
 		draw_circle(pos, 16.0, COLOR_TITLE, false, 1.0)
 		draw_string(font, pos + Vector2(-14, 34), id,
 			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COLOR_TEXT)
+
+
+# ==================== 版式（纯函数，便于 headless 校验）====================
+const NODE_RADIUS: float = 16.0
+
+
+func layout_positions(ids: Array, box: Vector2) -> Dictionary:
+	"""环形布局：给定节点 id 与面板尺寸，返回 id -> 坐标。
+
+	抽成纯函数是为了能脱离绘制流程做几何断言（见 godot/tests/panel_layout_check.gd）。
+	"""
+	var positions: Dictionary = {}
+	var count: int = ids.size()
+	if count == 0:
+		return positions
+	var center := Vector2(box.x * 0.5, box.y * 0.48)
+	var radius: float = min(box.x, box.y) * 0.30
+	for i in count:
+		var angle: float = -PI * 0.5 + TAU * float(i) / float(count)
+		positions[str(ids[i])] = center + Vector2(cos(angle), sin(angle)) * radius
+	return positions

@@ -191,8 +191,33 @@ E:\Software\Godot\Godot-4.5.2\Godot_v4.5.2-stable_win64.exe --path E:\graduate_s
 |---|---|---|
 | 脚本能加载、无解析错误 | `godot --headless --path ... --quit` | 无 SCRIPT ERROR / Parse Error |
 | 面板随主场景创建 | 同一命令的 stdout | `[INFO] 关系面板已就绪（按 R 显示/隐藏）` |
-| 真实拉到数据 | 窗口模式运行 10 秒的 stdout | `[INFO] 关系面板刷新: 节点 3 · 边 3`（两次，间隔 5 秒） |
-| **版式与观感** | 人工目视 | **待确认** —— 我无法看图，请跑一次看右上角是否被遮挡/字是否重叠 |
+| 真实拉到数据 | 窗口模式运行 8 秒的 stdout | `[INFO] 关系面板刷新: 节点 3 · 边 3` × 2（间隔 5 秒） |
+| `_draw` 无运行时错误 | 窗口模式（真实渲染） | 0 条 SCRIPT ERROR |
+| **版式几何** | `tests/panel_layout_check.gd`（headless） | **全部通过**，见下 |
+| 观感（配色/字号顺眼） | 人工目视 | 待确认 |
+
+### 版式几何自检
+
+```powershell
+E:\Software\Godot\Godot-4.5.2\Godot_v4.5.2-stable_win64_console.exe --headless ^
+    --path E:\graduate_student\AI\cybertown-eval\godot ^
+    --script res://tests/panel_layout_check.gd
+```
+
+实测输出（`godot/tests/panel_layout_check.gd`）：
+
+```
+视口: 1280x720   面板: 380x320   节点半径: 16
+[PASS] 面板完整落在视口内  rect=[P: (886.0, 14.0), S: (380.0, 320.0)]
+[PASS] 不与底部对话框重叠  面板底 334 / 对话框顶 502
+[PASS] 布局返回 3 个坐标  size=3
+[PASS] 节点在面板内且留 >=8px 边距  最小边距 41.6 px
+[PASS] 节点两两不重叠  最小间距 166.3 px（需 >= 38）
+[PASS] 版式几何检查全部通过
+```
+
+这检查的是「能不能看清」的客观前提（不越界、不压住对话框、节点不重叠），
+**不是审美**。配色与字号是否顺眼仍需人看一眼。
 
 ## 边界（不假装）
 
