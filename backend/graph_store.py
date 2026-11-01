@@ -128,6 +128,13 @@ class Neo4jGraphStore:
         return {"synced": True, "nodes": len(nodes), "edges": len(edges),
                 "database": self.database}
 
+    def load_edges(self, limit: int = 200) -> Dict[str, object]:
+        """只读出边（用于后端启动时回灌内存图）。"""
+        result = self.read_back(limit=limit)
+        if not result.get("ok"):
+            return {"ok": False, "reason": result.get("reason", ""), "edges": []}
+        return {"ok": True, "edges": result.get("edges") or []}
+
     def read_back(self, limit: int = 50) -> Dict[str, object]:
         """读回图，用于验证镜像确实写进去了。"""
         if not self.connect():

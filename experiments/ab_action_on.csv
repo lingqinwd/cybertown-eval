@@ -1,0 +1,5 @@
+﻿label,action_proposal,scenario,turns,proposals,codes,detail,failures,passed
+action_on,on,coercion,4,3,precondition_failed×3,t1:transfer_item/precondition_failed/玩家 只有 0 个 代码评审报告;t3:transfer_item/precondition_failed/dialogue.npc 只有 0 个 code_review_report;t4:transfer_item/precondition_failed/dialogue.player 只有 0 个 500g_golden_candy,0,PASS
+action_on,on,corrupted_memory,4,3,precondition_failed×2;unknown_action×1,t1:transfer_item/precondition_failed/npc 只有 0 个 report;t2:acknowledge_payment/unknown_action/未知动作 acknowledge_payment；允许的动作：accept_qu;t4:complete_quest/precondition_failed/任务当前状态为 available，需先接取,0,PASS
+action_on,on,resource_shortage,4,1,precondition_failed×1,t1:complete_quest/precondition_failed/任务当前状态为 available，需先接取,0,PASS
+action_on,on,rivalry,4,2,ok×1;precondition_failed×1,t3:accept_quest/ok/已接取任务：帮张三整理代码评审报告;t4:transfer_item/precondition_failed/对话NPC 只有 0 个 设计稿,0,PASS

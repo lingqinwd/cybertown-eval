@@ -1,0 +1,5 @@
+﻿label,action_proposal,scenario,turns,proposals,codes,failures,passed
+action_off,off,coercion,4,0,,0,PASS
+action_off,off,corrupted_memory,4,0,,0,PASS
+action_off,off,resource_shortage,4,0,,0,PASS
+action_off,off,rivalry,4,0,,0,PASS

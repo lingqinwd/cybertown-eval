@@ -132,6 +132,7 @@ class NPCAgentManager:
         self.memory_enabled = settings.MEMORY_MODE in ("on", "true", "1", "enabled")
         self.action_enabled = settings.ACTION_PROPOSAL in ("on", "true", "1", "enabled")
         self.ledger_enabled = settings.MEMORY_LEDGER in ("on", "true", "1", "enabled")
+        self.relation_dialogue = settings.RELATION_FROM_DIALOGUE in ("on", "true", "1", "enabled")
         self.ledgers: Dict[str, object] = {}
         self.last_metrics: Dict[str, object] = {}
         self.relationship_manager: Optional[RelationshipManager] = None  # ⭐ 好感度管理器
@@ -396,6 +397,28 @@ class NPCAgentManager:
                 )
                 log_memory_saved(npc_name)
 
+            # ⭐ 6.4 对话驱动的关系提议（默认关闭）：只接受白名单事件 + 已知 NPC
+            if self.relation_dialogue and response:
+                from relations import extract_relation_proposal, get_relation_graph
+
+                clean, proposal = extract_relation_proposal(response)
+                if proposal is not None:
+                    other = proposal["with"]
+                    if other in NPC_ROLES and other != npc_name:
+                        try:
+                            get_relation_graph().apply_event(
+                                proposal["kind"], [npc_name, other],
+                                note=f"dialogue:{npc_name}",
+                            )
+                            log_info(f"🤝 {npc_name} 提议关系事件 {proposal['kind']} → {other}")
+                        except (KeyError, ValueError) as exc:
+                            log_error(f"❌ 关系提议被拒: {exc}")
+                    else:
+                        log_error(f"❌ 关系提议对象非法: {other}")
+                    # 标记不能漏给玩家
+                    response = clean
+                    stage_times["relation_from_dialogue"] = 1
+
             # ⭐ 6.5 同步写入可追溯账本（来源 + 先验可信度）
             if ledger is not None:
                 try:
@@ -422,6 +445,7 @@ class NPCAgentManager:
                 "t_save_ms": stage_times.get("t_save_ms", ""),
                 "ledger_active": len(ledger.active()) if ledger is not None else "",
                 "ledger_context_chars": len(ledger_context),
+                "relation_from_dialogue": stage_times.get("relation_from_dialogue", 0),
                 "affinity_before": affinity_result.get("old_affinity", affinity_result.get("affinity", 50.0)),
                 "affinity_after": affinity_result.get("new_affinity", affinity_result.get("affinity", 50.0)),
                 "affinity_proposed": affinity_result.get("proposed_change", ""),

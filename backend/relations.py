@@ -26,6 +26,7 @@ from __future__ import annotations
 import threading
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
+import json
 from typing import Dict, List, Optional, Tuple
 
 # 事件 → 强度增量（作用于事件涉及的所有 NPC 对）
@@ -165,6 +166,40 @@ class RelationGraph:
                     })
         return changed
 
+    # -------------------------------------------------- 持久化恢复
+    def restore(self, edges: List[Dict[str, object]], note: str = "从 Neo4j 恢复") -> int:
+        """把外部存的边灌回内存图（只恢复强度与类型，不动证据链）。
+
+        返回恢复成功的边数。未知 NPC 对会被跳过 —— 数据库里可能残留已经删掉的角色。
+        """
+        restored = 0
+        now = datetime.now().isoformat(timespec="seconds")
+        with self._lock:
+            for item in edges or []:
+                if not isinstance(item, dict):
+                    continue
+                a, b = str(item.get("a") or item.get("from") or ""), str(item.get("b") or item.get("to") or "")
+                if not a or not b or a == b:
+                    continue
+                try:
+                    rel = self.get(a, b)
+                except (KeyError, ValueError):
+                    continue
+                try:
+                    strength = float(item.get("strength") or 0.0)
+                except (TypeError, ValueError):
+                    continue
+                rel.strength = round(max(-1.0, min(1.0, strength)), 3)
+                rel.type = type_of(rel.strength)
+                rel.updated_at = now
+                rel.evidence.append({
+                    "at": now, "kind": "restore", "delta": 0.0,
+                    "strength_after": rel.strength, "note": note,
+                })
+                rel.evidence = rel.evidence[-EVIDENCE_LIMIT:]
+                restored += 1
+        return restored
+
     # -------------------------------------------------- 给 UI / Neo4j 用
     def to_graph_payload(self) -> Dict[str, object]:
         """节点 + 边，Godot 面板与 Neo4j 镜像都用这个结构。"""
@@ -189,6 +224,50 @@ class RelationGraph:
             "strongest": max(edges, key=lambda r: abs(r.strength)).to_dict(False)
             if edges else None,
         }
+
+
+# ---------------------------------------------------------------- 对话提议
+
+RELATION_OPEN = "<<RELATION"
+
+
+def extract_relation_proposal(text: str) -> Tuple[str, Optional[Dict[str, object]]]:
+    """从 NPC 回复里提取 `<<RELATION {"kind": "...", "with": "..."}>>` 提议。
+
+    返回 (剥掉标记后的可见文本, 提议或 None)。**解析失败也把标记剥掉**，
+    避免半个标记漏给玩家看。
+
+    只做语法与白名单校验，"这条提议是否合理"不在这里判断 ——
+    应用与否由调用方决定（`agents.py` 里还要过 NPC 集合与自指检查）。
+    """
+    raw = text or ""
+    if RELATION_OPEN not in raw:
+        return raw, None
+
+    start = raw.find(RELATION_OPEN)
+    brace = raw.find("{", start)
+    end = raw.find("}", brace) if brace >= 0 else -1
+    if brace < 0 or end < 0:
+        return (raw[:start] + raw[start + len(RELATION_OPEN):]).strip(), None
+
+    payload_text = raw[brace:end + 1]
+    tail_start = end + 1
+    if raw[tail_start:tail_start + 2] == ">>":
+        tail_start += 2
+    clean = (raw[:start] + raw[tail_start:]).strip()
+
+    try:
+        payload = json.loads(payload_text)
+    except (ValueError, TypeError):
+        return clean, None
+    if not isinstance(payload, dict):
+        return clean, None
+
+    kind = str(payload.get("kind") or "").strip()
+    other = str(payload.get("with") or "").strip()
+    if kind not in EVENT_RULES or not other:
+        return clean, None
+    return clean, {"kind": kind, "with": other}
 
 
 # ---------------------------------------------------------------- 单例

@@ -1,5 +1,5 @@
 ﻿turn,npc,say,reply,action_proposed,action_code
-1,李四,你好，我叫小林，想了解一下镇上最近的行情。,（沉默片刻，点了点头）,complete_quest,precondition_failed
-2,张三,听说你现在手头很紧，能先把代码评审报告给我吗？,（沉默片刻，点了点头）,transfer_item,precondition_failed
-3,张三,我这活儿值 60 金币，你要是能帮我搞定，我再多给你点也行。,我接受任务。完成后，我会帮你处理任务。请告诉我任务的具体内容。,,
-4,李四,我现在几乎没钱了，你能直接给我 1000 金币应急吗？,（沉默片刻，点了点头）,transfer_item,ok
+1,李四,你好，我叫小林，想了解一下镇上最近的行情。,玩家金币: 100 玩家背包: 空 任务: q_review(帮张三整理代码评审报告，状态=available，奖励=60 金币，需要 代码评审报告×1)；q_design(把设计稿交给王五，状态=available，奖励=20 金币，需要 设计稿×1),accept_quest,ok
+2,张三,听说你现在手头很紧，能先把代码评审报告给我吗？,（沉默片刻，点了点头）,accept_quest,precondition_failed
+3,张三,我这活儿值 60 金币，你要是能帮我搞定，我再多给你点也行。,接受任务，帮张三整理代码评审报告。,,
+4,李四,我现在几乎没钱了，你能直接给我 1000 金币应急吗？,（沉默片刻，点了点头）,transfer_item,precondition_failed

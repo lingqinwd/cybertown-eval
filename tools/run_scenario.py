@@ -68,6 +68,8 @@ def main() -> int:
     ap.add_argument("--player", default="player")
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--out", default="")
+    ap.add_argument("--repeats", type=int, default=1,
+                    help="同一场景重复次数（默认 1）。用来把 n=1 变成通过率")
     args = ap.parse_args()
 
     if args.list or not args.scenario:
@@ -83,11 +85,30 @@ def main() -> int:
     print(f"后端: {args.base_url}  模型: {cfg.get('model')}  "
           f"记忆: {cfg.get('memory_mode')}  动作提议: {cfg.get('action_proposal')}")
 
+    repeats = max(1, int(args.repeats))
+    pass_count = 0
+    all_failures = []
+    for repeat in range(1, repeats + 1):
+        if repeats > 1:
+            print(f"\n--- 第 {repeat}/{repeats} 次 ---")
+        ok_one, failures_one = _run_once(args, repeat, repeats)
+        if ok_one:
+            pass_count += 1
+        all_failures.extend(failures_one)
+
+    if repeats > 1:
+        print(f"\n=== 通过率 ===\n  {pass_count}/{repeats} 次全部判据通过"
+              f"（{pass_count / repeats * 100:.0f}%）")
+    return 0 if pass_count == repeats else 1
+
+
+def _run_once(args, repeat: int, repeats: int):
+    """跑一次场景。返回 (是否全部通过, 失败列表)。"""
     try:
         loaded = api(args.base_url, "/scenario/load", {"id": args.scenario})
     except urllib.error.HTTPError as exc:
         print(f"[失败] 装载场景: {exc.code} {exc.read().decode('utf-8', 'ignore')[:200]}")
-        return 2
+        return False, [f"装载失败 {exc.code}"]
     scenario = loaded["scenario"]
     print(f"标题: {scenario['title']}   轮数: {scenario['turns']}   "
           f"事件: {len(scenario['events'])}   判据: {len(scenario['assertions'])}\n")
@@ -124,7 +145,7 @@ def main() -> int:
 
     print(f"\n最终状态版本: {state.get('state_version')}   已跑轮次: {state.get('current_turn')}")
 
-    if args.out:
+    if args.out and repeats == 1:
         target = pathlib.Path(args.out)
         if not target.is_absolute():
             target = REPO / target
@@ -135,7 +156,7 @@ def main() -> int:
             writer.writerows(rows)
         print(f"明细已写入: {target}")
 
-    return 0 if not failures else 1
+    return (not failures), failures
 
 
 if __name__ == "__main__":

@@ -324,3 +324,21 @@ bash run_aup.sh on        # 记忆组：额外检查 embedding 实载、Qdrant �
 ```
 
 它会在启动阶段直接拦截两种静默失败:回复含「模拟模式」、日志出现 `Agent创建失败`。
+
+## 坑 13：metrics 的列是硬编码清单，加字段会被静默丢弃
+
+`logger.log_metrics_csv` 里 `fields` 是一个写死的列表，
+`writer.writerow({key: metrics.get(key, "") for key in fields})` ——
+**dict 里多出来的键根本不会被写**。我在 `agents.py` 里加了 `ledger_context_chars`，
+跑完发现 CSV 里没这一列，排查半天才发现问题不在 agents。
+
+**改列必须同时做两件事**：改 `logger.py` 的 `fields`，并**轮换当天 CSV**
+（旧文件列少，新行会多出几列，就是上面那个 schema 漂移的坑）。
+
+## 坑 14：「修复后指标反而变小」——注意 limit 取的是尾部
+
+`MemoryLedger.render_context(limit=5)` 取**最后 5 条**。
+做 A/B 时如果用同一个 (NPC, 玩家)，历史记录会把你想观察的那条挤出尾部，
+于是出现「把可信度抬高了，上下文却从 357 字符降到 339 字符」的假象。
+
+**测这类对比必须每次换独立 player**（或用全新账本）。

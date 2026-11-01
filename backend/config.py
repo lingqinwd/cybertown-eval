@@ -43,6 +43,12 @@ class Settings:
     # 账本注入 prompt 时的可信度下限：低于此值的记忆不会进入上下文
     MEMORY_MIN_CREDIBILITY: float = float(os.getenv("MEMORY_MIN_CREDIBILITY", "0.5"))
 
+    # 是否允许 NPC 在回复里用 <<RELATION {json}>> 提议改变 NPC 间关系
+    # 默认 off：小模型产出这种标记的可靠性很低，开着只是多一层可观测性
+    RELATION_FROM_DIALOGUE: str = os.getenv("RELATION_FROM_DIALOGUE", "off").strip().lower()
+    # 后端启动时是否从 Neo4j 回灌关系图
+    RELATION_RESTORE_ON_START: str = os.getenv("RELATION_RESTORE_ON_START", "on").strip().lower()
+
     # CORS配置
     CORS_ORIGINS = ["*"]  # 生产环境应限制具体域名
 

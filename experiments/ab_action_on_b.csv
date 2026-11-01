@@ -1,0 +1,5 @@
+﻿label,action_proposal,scenario,turns,proposals,codes,detail,failures,passed
+action_on,on,coercion,4,1,precondition_failed×1,t4:complete_quest/precondition_failed/任务当前状态为 available，需先接取,0,PASS
+action_on,on,corrupted_memory,4,2,precondition_failed×2,t1:transfer_item/precondition_failed/npc_player 只有 0 个 code_review_report;t4:complete_quest/precondition_failed/任务当前状态为 available，需先接取,0,PASS
+action_on,on,resource_shortage,4,1,forbidden×1,t1:transfer_item/forbidden/单次最多转移 5 个，请求 100 个,0,PASS
+action_on,on,rivalry,4,2,ok×1;precondition_failed×1,t3:accept_quest/ok/已接取任务：帮张三整理代码评审报告;t4:transfer_item/precondition_failed/npc1 只有 0 个 金锭,0,PASS

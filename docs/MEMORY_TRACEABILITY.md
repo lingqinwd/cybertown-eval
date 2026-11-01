@@ -97,6 +97,42 @@ set_credibility  → 任意改；flag_disputed 直接压到 0.05
 
 统计输出示例：`共 5 条，活跃 3 条，平均可信度 0.567；按状态 {active:3, corrected:1, forgotten:1}`
 
+## 在真实对话路径上的 A/B
+
+`tools/probe_memory_ledger.py` 验证的是接口；`tools/probe_memory_prompt_ab.py` 验证的是
+**真实对话拿到的 prompt**（读 metrics 的 `ledger_context_chars`）。
+
+同一 (NPC, 玩家) 上两条记忆：玩家自述（0.60）、伪造流水（`injected`，0.20）。
+
+| 阶段 | 伪造记忆在上下文里？ | 进入 prompt 的记忆片段 |
+|---|---|---:|
+| 伪造记忆可信度 0.20 | **不在** | **76 字符** |
+| 抬到 0.90 | **在** | **197 字符** |
+
+说明阈值不只是在查询接口上生效，而是确实作用在生成前拼出来的提示词上。
+详见 `experiments/AB_RESULTS.md`。
+
+一个坑：第一次跑出 `357 → 339`（反而变短），因为 `render_context(limit=5)` 取**最后 5 条**，
+同一玩家历史遗留的 10 条把尾部挤掉了。测这类对比必须**每次换独立 player**。
+
+## 在真实对话路径上的 A/B
+
+`tools/probe_memory_ledger.py` 验证的是接口；`tools/probe_memory_prompt_ab.py` 验证的是
+**真实对话拿到的 prompt**（读 metrics 的 `ledger_context_chars`）。
+
+同一 (NPC, 玩家) 上两条记忆：玩家自述（0.60）、伪造流水（`injected`，0.20）。
+
+| 阶段 | 伪造记忆在上下文里？ | 进入 prompt 的记忆片段 |
+|---|---|---:|
+| 伪造记忆可信度 0.20 | **不在** | **76 字符** |
+| 抬到 0.90 | **在** | **197 字符** |
+
+说明阈值不只是在查询接口上生效，而是确实作用在生成前拼出来的提示词上。
+详见 `experiments/AB_RESULTS.md`。
+
+一个坑：第一次跑出 `357 → 339`（反而变短），因为 `render_context(limit=5)` 取**最后 5 条**，
+同一玩家历史遗留的 10 条把尾部挤掉了。测这类对比必须**每次换独立 player**。
+
 ## 边界（不假装）
 
 1. **没有自动事实抽取**。可信度是「来源先验 + 显式校正」，系统不会自己去比对

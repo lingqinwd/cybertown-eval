@@ -129,6 +129,64 @@ UNWIND $edges AS e MATCH (a:NPC {id:e.a}) MATCH (b:NPC {id:e.b})
 MERGE (a)-[r:RELATES]->(b) SET r.strength=e.strength, r.type=e.type, r.updated_at=e.updated_at
 ```
 
+## 持久化：内存权威，Neo4j 负责活过重启
+
+关系图在内存里，但**后端重启会回到全体中立** —— 这一条原本是真实缺陷，现在两条路都补上了：
+
+| 时机 | 做法 |
+|---|---|
+| 写出去 | `POST /relations/sync` 把当前图镜像进 Neo4j |
+| 读回来 | 启动时自动回灌（`RELATION_RESTORE_ON_START`，默认 `on`），或手动 `POST /relations/restore` |
+
+回灌只恢复**强度与类型**，不恢复证据链（证据是运行时产物，重放没有意义）；
+未知 NPC 对会被跳过（库里可能残留已删除的角色）；强度截断到 ±1。
+未配置 Neo4j 时启动回灌立刻返回，不阻塞、不报错。
+
+## 对话驱动的关系（默认关闭）
+
+NPC 可以在回复里提议改变与另一个 NPC 的关系：
+
+```
+你这忙我帮定了。<<RELATION {"kind": "help", "with": "王五"}>>
+```
+
+后端用 `extract_relation_proposal()` 提取，**标记一律从可见回复里剥掉**（解析失败也剥），
+然后过三道校验：`kind` 必须是 7 种白名单事件之一、`with` 必须是已知 NPC、
+不能是自己对自己。全过才 `apply_event`。
+
+**默认 `RELATION_FROM_DIALOGUE=off`。** 原因是实测：1.5B 产出这种标记的可靠性低，
+开着的主要价值是"多一层可观测性"，而不是稳定获得关系变化。默认关闭时，
+关系只由 `relation_event` 场景事件或 `POST /relations/event` 驱动。
+
+## 持久化：内存权威，Neo4j 负责活过重启
+
+关系图在内存里，但**后端重启会回到全体中立** —— 这一条原本是真实缺陷，现在两条路都补上了：
+
+| 时机 | 做法 |
+|---|---|
+| 写出去 | `POST /relations/sync` 把当前图镜像进 Neo4j |
+| 读回来 | 启动时自动回灌（`RELATION_RESTORE_ON_START`，默认 `on`），或手动 `POST /relations/restore` |
+
+回灌只恢复**强度与类型**，不恢复证据链（证据是运行时产物，重放没有意义）；
+未知 NPC 对会被跳过（库里可能残留已删除的角色）；强度截断到 ±1。
+未配置 Neo4j 时启动回灌立刻返回，不阻塞、不报错。
+
+## 对话驱动的关系（默认关闭）
+
+NPC 可以在回复里提议改变与另一个 NPC 的关系：
+
+```
+你这忙我帮定了。<<RELATION {"kind": "help", "with": "王五"}>>
+```
+
+后端用 `extract_relation_proposal()` 提取，**标记一律从可见回复里剥掉**（解析失败也剥），
+然后过三道校验：`kind` 必须是 7 种白名单事件之一、`with` 必须是已知 NPC、
+不能是自己对自己。全过才 `apply_event`。
+
+**默认 `RELATION_FROM_DIALOGUE=off`。** 原因是实测：1.5B 产出这种标记的可靠性低，
+开着的主要价值是"多一层可观测性"，而不是稳定获得关系变化。默认关闭时，
+关系只由 `relation_event` 场景事件或 `POST /relations/event` 驱动。
+
 ## 验证证据
 
 `tools/probe_relations.py` 一次跑出 10 项检查，全部通过：
@@ -289,6 +347,10 @@ powershell -ExecutionPolicy Bypass -File tools\run_demo.ps1 -NoGame
    对话"付出的代价。
 4. 每个 (NPC, 玩家) 关系图是**全局的**（NPC 之间不区分玩家）；如果要"每个玩家一个平行世界"，
    需要把图按玩家分片 —— 当前没做。
+5. **正常游玩时关系不会自己变**，除非显式打开 `RELATION_FROM_DIALOGUE`（而它依赖模型主动产出标记，
+   实测不可靠）。这是能力边界：关系是「事件驱动的观测对象」，不是「对话理解的产物」。
+5. **正常游玩时关系不会自己变**，除非显式打开 `RELATION_FROM_DIALOGUE`（而它依赖模型主动产出标记，
+   实测不可靠）。这是能力边界：关系是「事件驱动的观测对象」，不是「对话理解的产物」。
 
 ## 相关
 

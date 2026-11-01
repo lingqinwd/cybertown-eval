@@ -11,7 +11,8 @@
 
 param(
     [string]$Python = "",
-    [switch]$NoGame
+    [switch]$NoGame,
+    [switch]$Force   # 允许强杀占用 8000 端口的进程
 )
 
 $ErrorActionPreference = 'Stop'
@@ -56,7 +57,12 @@ Say "[1/4] 解释器: $Python" 'Green'
 $conn = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
 if ($conn) {
     $oldPid = $conn[0].OwningProcess
-    Say "[2/4] 端口 8000 已被 PID=$oldPid 占用，先停掉" 'Yellow'
+    if (-not $Force) {
+        Say "[2/4] 端口 8000 已被 PID=$oldPid 占用，已中止（可能是你别的服务）" 'Yellow'
+        Say "      确认可以杀掉再加 -Force，或先手动停掉它" 'Yellow'
+        exit 1
+    }
+    Say "[2/4] 端口 8000 被 PID=$oldPid 占用，按 -Force 强制停掉" 'Yellow'
     Stop-Process -Id $oldPid -Force -ErrorAction SilentlyContinue
     Start-Sleep -Milliseconds 800
 }

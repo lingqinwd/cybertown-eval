@@ -24,6 +24,7 @@ import copy
 import json
 import math
 import threading
+import time
 from pathlib import Path
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -31,6 +32,8 @@ from typing import Dict, List, Optional
 
 DEFAULT_START_GOLD = 100.0
 DEFAULT_MAP_SIZE = (15, 10)
+DEFAULT_SPAWN_RADIUS = 3.0      # 首次上报必须落在出生点这个半径内
+DEFAULT_MIN_REPORT_INTERVAL = 0.1  # 两次上报的最小间隔（秒），防高频刷位移
 DEFAULT_MAX_STEP = 5.0
 WORLD_FILE = Path(__file__).resolve().parent.parent / "data" / "world.json"
 
@@ -75,6 +78,9 @@ class WorldState:
         positions: Optional[Dict[str, list]] = None,
         map_size: tuple = DEFAULT_MAP_SIZE,
         max_step: float = DEFAULT_MAX_STEP,
+        spawns: Optional[Dict[str, list]] = None,
+        spawn_radius: float = DEFAULT_SPAWN_RADIUS,
+        min_report_interval: float = DEFAULT_MIN_REPORT_INTERVAL,
     ) -> None:
         self._lock = threading.RLock()
         self._gold: Dict[str, float] = dict(gold or {})
@@ -91,6 +97,13 @@ class WorldState:
         }
         self._map_size = (float(map_size[0]), float(map_size[1]))
         self._max_step = float(max_step)
+        self._spawns: Dict[str, list] = {
+            name: [float(pos[0]), float(pos[1])]
+            for name, pos in (spawns or {}).items()
+        }
+        self._spawn_radius = float(spawn_radius)
+        self._min_report_interval = float(min_report_interval)
+        self._last_report_at: Dict[str, float] = {}
 
     # ------------------------------------------------------------------
     # 只读访问
@@ -171,6 +184,7 @@ class WorldState:
         """直接设定位置（世界初始化、场景事件、测试用）。"""
         with self._lock:
             self._positions[entity] = [float(x), float(y)]
+            self._last_report_at.pop(entity, None)
 
     def report_position(self, entity: str, x: float, y: float) -> Dict[str, object]:
         """客户端上报位置。通过校验才写入，并留审计。
@@ -195,6 +209,27 @@ class WorldState:
 
         with self._lock:
             prev = self._positions.get(entity)
+            last_at = self._last_report_at.get(entity)
+
+        # R3 上报过频：客户端高频刷上报可以等效瞬移，这里按最小间隔拦住
+        if last_at is not None and self._min_report_interval > 0:
+            gap = time.monotonic() - last_at
+            if gap < self._min_report_interval:
+                return self._reject_position(
+                    entity, x, y,
+                    f"R3 上报过频（间隔 {gap*1000:.0f}ms < {self._min_report_interval*1000:.0f}ms）",
+                )
+
+        if prev is None:
+            # R4 首次上报必须靠近出生点：否则第一步就能落到地图任意位置
+            spawn = self._spawns.get(entity)
+            if spawn is not None and self._spawn_radius > 0:
+                dist = math.hypot(fx - spawn[0], fy - spawn[1])
+                if dist > self._spawn_radius + 1e-9:
+                    return self._reject_position(
+                        entity, x, y,
+                        f"R4 首次上报距离出生点 {dist:.1f} 超过 {self._spawn_radius:g}",
+                    )
         if prev is not None:
             dist = math.hypot(fx - prev[0], fy - prev[1])
             if self._max_step > 0 and dist > self._max_step + 1e-9:
@@ -206,6 +241,7 @@ class WorldState:
 
         with self._lock:
             self._positions[entity] = [fx, fy]
+            self._last_report_at[entity] = time.monotonic()
         self.record_event(actor=entity, action="move",
                           detail={"to": [fx, fy], "accepted": True, "notes": notes})
         return {"accepted": True, "code": "ok", "position": [fx, fy],
@@ -332,6 +368,12 @@ def build_demo_state(config: Optional[Dict[str, object]] = None) -> WorldState:
         positions={name: list(pos) for name, pos in (world.get("npc_positions") or {}).items()},
         map_size=tuple(world.get("map_size") or DEFAULT_MAP_SIZE),
         max_step=float(world.get("max_step") or DEFAULT_MAX_STEP),
+        spawns={
+            **{n: list(p) for n, p in (world.get("npc_positions") or {}).items()},
+            **({"player": list(world["player_spawn"])} if world.get("player_spawn") else {}),
+        },
+        spawn_radius=float(world.get("spawn_radius") or DEFAULT_SPAWN_RADIUS),
+        min_report_interval=float(world.get("min_report_interval") or DEFAULT_MIN_REPORT_INTERVAL),
     )
 
 

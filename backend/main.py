@@ -121,6 +121,31 @@ async def runtime_config():
 from relations import get_relation_graph, reset_relation_graph
 get_relation_graph(list(NPC_ROLES.keys()))   # 以 NPC_ROLES 为节点集初始化
 
+
+def _restore_relations_from_store() -> Dict[str, Any]:
+    """从 Neo4j 把关系灌回内存图。未配置或连不上时安静跳过。"""
+    from graph_store import get_graph_store
+    from relations import get_relation_graph
+
+    store = get_graph_store()
+    if not store.configured:
+        return {"restored": 0, "reason": "Neo4j 未配置"}
+    loaded = store.load_edges()
+    if not loaded.get("ok"):
+        return {"restored": 0, "reason": loaded.get("reason", "")}
+    count = get_relation_graph().restore(loaded.get("edges") or [])
+    return {"restored": count, "reason": ""}
+
+
+# 启动时尝试回灌一次（未配置 Neo4j 时立刻返回，不阻塞启动）
+if settings.RELATION_RESTORE_ON_START in ("on", "true", "1", "enabled"):
+    try:
+        _startup_restore = _restore_relations_from_store()
+        if _startup_restore.get("restored"):
+            log_info(f"🤝 启动回灌：从 Neo4j 恢复 {_startup_restore['restored']} 条关系")
+    except Exception as exc:  # 恢复失败不能拖垮启动
+        log_error(f"❌ 启动回灌失败: {exc}")
+
 @app.get("/world/position")
 async def world_position(entity: str = ""):
     """查询位置；不传 entity 则返回全部。"""
@@ -179,6 +204,13 @@ async def relations_event(payload: Dict[str, Any]):
     except (KeyError, ValueError) as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return {"changed": changed, "stats": get_relation_graph().stats()}
+
+
+@app.post("/relations/restore")
+async def relations_restore():
+    """从 Neo4j 把关系灌回内存图（后端重启后恢复现场）。"""
+    result = _restore_relations_from_store()
+    return {"store": __import__("graph_store").get_graph_store().describe(), **result}
 
 
 @app.post("/relations/reset")

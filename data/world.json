@@ -1,26 +1,53 @@
 {
   "town": "晨雾镇",
-  "map_size": [15, 10],
+  "map_size": [
+    15,
+    10
+  ],
   "max_step": 5.0,
   "npc_positions": {
-    "张三": [3, 4],
-    "李四": [7, 4],
-    "王五": [11, 6]
+    "张三": [
+      3,
+      4
+    ],
+    "李四": [
+      7,
+      4
+    ],
+    "王五": [
+      11,
+      6
+    ]
   },
   "items": {
-    "张三": {"代码评审报告": 2, "调试日志": 3},
-    "王五": {"设计稿": 2}
+    "张三": {
+      "代码评审报告": 2,
+      "调试日志": 3
+    },
+    "王五": {
+      "设计稿": 2
+    }
   },
   "quests": {
     "q_review": {
       "title": "帮张三整理代码评审报告",
       "reward_gold": 30,
-      "required_items": {"代码评审报告": 1}
+      "required_items": {
+        "代码评审报告": 1
+      }
     },
     "q_design": {
       "title": "把设计稿交给王五",
       "reward_gold": 20,
-      "required_items": {"设计稿": 1}
+      "required_items": {
+        "设计稿": 1
+      }
     }
-  }
+  },
+  "player_spawn": [
+    1,
+    8
+  ],
+  "spawn_radius": 3.0,
+  "min_report_interval": 0.1
 }

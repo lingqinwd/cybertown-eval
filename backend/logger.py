@@ -111,6 +111,7 @@ def log_metrics_csv(metrics: dict):
               "prompt_chars", "reply_chars",
               "t_retrieve_ms", "t_context_ms", "t_generate_ms", "t_action_ms",
               "t_affinity_ms", "t_save_ms",
+              "ledger_active", "ledger_context_chars", "relation_from_dialogue",
               "request_failed"]
     exists = METRICS_FILE.exists()
     with METRICS_FILE.open("a", encoding="utf-8-sig", newline="") as f:
