@@ -1,0 +1,95 @@
+=== 计划 ===
+  block 1: 第 1 次 / MEMORY_MODE=off / 6 轮
+  block 2: 第 1 次 / MEMORY_MODE=on / 6 轮
+  block 3: 第 2 次 / MEMORY_MODE=on / 6 轮
+  block 4: 第 2 次 / MEMORY_MODE=off / 6 轮
+  block 5: 第 3 次 / MEMORY_MODE=off / 6 轮
+  block 6: 第 3 次 / MEMORY_MODE=on / 6 轮
+  block 7: 第 4 次 / MEMORY_MODE=on / 6 轮
+  block 8: 第 4 次 / MEMORY_MODE=off / 6 轮
+  模型: qwen2.5:1.5b @ http://127.0.0.1:11434/v1
+  额外环境: ['EMBED_MODEL_TYPE=local', 'EMBED_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2', 'EMBED_BASE_URL=', 'EMBED_API_KEY=', 'HF_HOME=D:\\HFCache', 'HF_ENDPOINT=https://hf-mirror.com']
+  Qdrant 可用: http://127.0.0.1:6333
+
+[block 1/8] 第 1 次 · MEMORY_MODE=off
+    后端就绪: mode=off model=qwen2.5:1.5b action=off
+    [1/6] 李四     1033 ms  recall=0  你好小林，很高兴认识你。你的项目听起来非常有趣，赛博
+    [2/6] 李四      884 ms  recall=0  ← 未命中  当然记得，我是李四，我们正在讨论“HelloAgen
+    [3/6] 张三     1066 ms  recall=0  我主要负责多智能体系统的开发和优化，特别是在Hell
+    [4/6] 张三     1197 ms  recall=0  当然可以，我建议你先定义一下你的小镇项目具体的功能和
+    [5/6] 王五     1067 ms  recall=0  我主要负责界面设计和用户体验。最近在尝试用更直观的界
+    [6/6] 王五     1522 ms  recall=0  你好！我建议我们可以考虑使用Unity3D引擎来开发
+
+[block 2/8] 第 1 次 · MEMORY_MODE=on
+    后端就绪: mode=on model=qwen2.5:1.5b action=off
+    [1/6] 李四     3495 ms  recall=0  你好小林，很高兴认识你。我是李四，负责产品规划和需求
+    [2/6] 李四     3571 ms  recall=2  ← 事实命中  记得啦，小林，你正在做的项目是赛博小镇课程。听起来很
+    [3/6] 张三     3398 ms  recall=0  你好！我主要负责多智能体系统的开发和优化。最近在尝试
+    [4/6] 张三     3829 ms  recall=2  当然可以！你可以考虑使用多智能体系统来实现不同的角色
+    [5/6] 王五     3487 ms  recall=0  你好！我主要负责界面设计，用我的细腻敏感和专业技能，
+    [6/6] 王五     3630 ms  recall=2  当然可以！对于赛博小镇项目，我推荐你使用Materi
+
+[block 3/8] 第 2 次 · MEMORY_MODE=on
+    后端就绪: mode=on model=qwen2.5:1.5b action=off
+    [1/6] 李四     3402 ms  recall=0  你好小林，很高兴认识你。我是产品经理李四，专注于需求
+    [2/6] 李四     3618 ms  recall=2  ← 事实命中  记得你啊，小林。你现在在做的赛博小镇课程项目挺酷的，
+    [3/6] 张三     3324 ms  recall=0  我主要负责多智能体系统的开发，使用HelloAgen
+    [4/6] 张三     3947 ms  recall=2  当然可以！首先，你需要明确项目的具体需求，比如是需要
+    [5/6] 王五     3381 ms  recall=0  我主要负责界面设计和交互设计，致力于提升用户体验，追
+    [6/6] 王五     3688 ms  recall=2  当然可以！了解你的项目需求和目标，然后设想用户可能的
+
+[block 4/8] 第 2 次 · MEMORY_MODE=off
+    后端就绪: mode=off model=qwen2.5:1.5b action=off
+    [1/6] 李四      991 ms  recall=0  你好，小林。很高兴认识你，这听起来非常有趣。是赛博小
+    [2/6] 李四      921 ms  recall=0  ← 未命中  记得你哦！你正在开发一个多人在线游戏，对吧？我很期待
+    [3/6] 张三      947 ms  recall=0  我主要负责多智能体系统的开发和优化，使用HelloA
+    [4/6] 张三     1422 ms  recall=0  当然可以！你正在构建一个赛博小镇项目，这听起来很棒。
+    [5/6] 王五     1122 ms  recall=0  我是UI设计师，主要负责界面设计和用户体验。最近在忙
+    [6/6] 王五     1553 ms  recall=0  当然可以，你提到的赛博小镇项目听起来很有前景！它可能
+
+[block 5/8] 第 3 次 · MEMORY_MODE=off
+    后端就绪: mode=off model=qwen2.5:1.5b action=off
+    [1/6] 李四     1087 ms  recall=0  你好小林，很高兴认识你。我是李四，负责需求分析。这个
+    [2/6] 李四      974 ms  recall=0  ← 未命中  玩家：你好，我是Datawhale办公室的李四，正在
+    [3/6] 张三     1070 ms  recall=0  你好！我主要负责多智能体系统的研究与开发。最近在尝试
+    [4/6] 张三     1316 ms  recall=0  当然可以！关于你的赛博小镇项目，我建议你可以考虑使用
+    [5/6] 王五     1130 ms  recall=0  我主要负责界面设计，追求每一个细节的美感。最近在设计
+    [6/6] 王五     1461 ms  recall=0  当然可以，赛博小镇项目听起来很有创意！我在前期调研中
+
+[block 6/8] 第 3 次 · MEMORY_MODE=on
+    后端就绪: mode=on model=qwen2.5:1.5b action=off
+    [1/6] 李四     3350 ms  recall=0  你好小林，很高兴认识你。是的，我听说过你的项目，叫做
+    [2/6] 李四     3423 ms  recall=2  ← 事实命中  当然记得，我是你的同行小林。我目前正在开发一个赛博小
+    [3/6] 张三     3300 ms  recall=0  主要是负责多智能体系统的开发和维护。最近在尝试用He
+    [4/6] 张三     3778 ms  recall=2  当然可以！首先，确保你的项目有清晰的结构，包括明确的
+    [5/6] 王五     3472 ms  recall=0  我是UI设计师，主要负责界面设计和用户体验。最近在尝
+    [6/6] 王五     3889 ms  recall=2  当然可以，很高兴能帮你。首先，我觉得你的项目需要明确
+
+[block 7/8] 第 4 次 · MEMORY_MODE=on
+    后端就绪: mode=on model=qwen2.5:1.5b action=off
+    [1/6] 李四     3549 ms  recall=0  你好，小林。很高兴认识你，我叫李四，是产品规划负责人
+    [2/6] 李四     3435 ms  recall=2  ← 事实命中  当然记得，小林。你正在做的赛博小镇课程项目听起来非常
+    [3/6] 张三     3357 ms  recall=0  我主要负责多智能体系统的开发工作，使用HelloAg
+    [4/6] 张三     3733 ms  recall=2  当然可以！首先确保你的代码结构清晰，遵循PEP8标准
+    [5/6] 王五     3357 ms  recall=0  我主要负责界面设计和交互设计，专注于提升用户体验。很
+    [6/6] 王五     3585 ms  recall=2  当然可以，我的建议是确保界面的流畅性和易用性。使用简
+
+[block 8/8] 第 4 次 · MEMORY_MODE=off
+    后端就绪: mode=off model=qwen2.5:1.5b action=off
+    [1/6] 李四     1082 ms  recall=0  你好，小林！很高兴认识你。我叫李四，是我们的产品经理
+    [2/6] 李四     1037 ms  recall=0  ← 未命中  你好！我记得你，你在做一个关于智能生活系统的项目，对
+    [3/6] 张三     1038 ms  recall=0  我主要负责多智能体系统的开发和技术框架的研究，比如H
+    [4/6] 张三      948 ms  recall=0  当然可以，你打算用赛博小镇项目的目的是什么？
+    [5/6] 王五     1133 ms  recall=0  你好!我是UI设计师，主要负责界面设计和交互体验。最
+    [6/6] 王五     1141 ms  recall=0  我最近在研究赛博朋克风格的界面设计，或许可以参考我之
+
+=== 汇总 ===
+记忆       样本     均值 ms     中位 ms     召回总数
+--------------------------------------------
+off      24      1131      1076        0
+on       24      3542      3491       24
+--------------------------------------------
+记忆开销倍数（均值 on/off）: 3.13×   （中位: 3.24×）
+追问事实命中: 4/8
+
+明细已写入: E:\graduate_student\AI\cybertown-eval\experiments\matrix_gpu_local_embed_r4.csv

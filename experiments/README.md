@@ -16,7 +16,10 @@
 | `results_template.csv` | — | — | 空白模板 |
 | `matrix_local_qwen1.5b.csv` | 本地复现（off/on × 2 次） | 服务端 | A-B-B-A 交错 24 轮的客户端/服务端延迟、召回数、回复原文 |
 | `matrix_local_qwen1.5b.txt` | 同上 | 控制台 | 逐轮明细与汇总（倍数 3.75×） |
-| `MATRIX_REPLICATION.md` | 同上 | — | **本地复现的设计、结果、预测被推翻的原因与边界** |
+| `MATRIX_REPLICATION.md` | 同上 | — | **A/B/C 三组受控对照的设计、结果、归因与边界** |
+| `matrix_local_embed.csv` | A 的 2 次子集（本地 embedding） | 服务端 | 比值 3.12×，用于确认重复次数不影响结果 |
+| `matrix_gpu_local_embed_r4.csv` | B：GPU + 本地 embedding，4 次 | 服务端 | 48 轮，比值 3.13× |
+| `matrix_cpu_local_embed.csv` | C：CPU + 本地 embedding，2 次 | 服务端 | 24 轮，比值 1.23× |
 
 > 端侧(C/D)的**客户端端到端延迟**单独保存在 `.turns.csv` 中,由浏览器控制台脚本导出,未纳入本仓库。如需完整重跑,脚本思路见 [../docs/EXPERIMENT_RESULTS.md](../docs/EXPERIMENT_RESULTS.md) §1。
 

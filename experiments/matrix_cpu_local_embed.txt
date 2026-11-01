@@ -1,0 +1,55 @@
+=== 计划 ===
+  block 1: 第 1 次 / MEMORY_MODE=off / 6 轮
+  block 2: 第 1 次 / MEMORY_MODE=on / 6 轮
+  block 3: 第 2 次 / MEMORY_MODE=on / 6 轮
+  block 4: 第 2 次 / MEMORY_MODE=off / 6 轮
+  模型: qwen2.5:1.5b @ http://127.0.0.1:11434/v1
+  额外环境: ['EMBED_MODEL_TYPE=local', 'EMBED_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2', 'EMBED_BASE_URL=', 'EMBED_API_KEY=', 'HF_HOME=D:\\HFCache', 'HF_ENDPOINT=https://hf-mirror.com']
+  Qdrant 可用: http://127.0.0.1:6333
+
+[block 1/4] 第 1 次 · MEMORY_MODE=off
+    后端就绪: mode=off model=qwen2.5:1.5b action=off
+    [1/6] 李四    11399 ms  recall=0  你好小林！很高兴认识你。我叫李四，是我们在Dataw
+    [2/6] 李四    12767 ms  recall=0  ← 未命中  当然记得呀！我是Datawhale办公室的李四，我正
+    [3/6] 张三    13804 ms  recall=0  你好，我主要负责多智能体系统开发。最近在写代码，挺有
+    [4/6] 张三    18419 ms  recall=0  当然可以！首先，我觉得咱们可以先了解一下赛博小镇的背
+    [5/6] 王五    15137 ms  recall=0  我主要负责界面设计和用户体验，最近在尝试新的设计挑战
+    [6/6] 王五    16860 ms  recall=0  你好！当然可以。首先，我建议你在界面设计上多考虑用户
+
+[block 2/4] 第 1 次 · MEMORY_MODE=on
+    后端就绪: mode=on model=qwen2.5:1.5b action=off
+    [1/6] 李四    13100 ms  recall=0  你好，小林！很高兴认识你。课程项目听起来很有意思，希
+    [2/6] 李四    17046 ms  recall=2  ← 事实命中  当然记得，我是小林，正在做一个赛博小镇的课程项目。有
+    [3/6] 张三    19950 ms  recall=0  我主要负责Python开发，特别是多智能体系统的工作
+    [4/6] 张三    18883 ms  recall=2  当然可以！首先确保你的代码结构清晰，模块化好。其次，
+    [5/6] 王五    22408 ms  recall=0  我主要负责界面设计、交互设计和视觉呈现。最近在尝试新
+    [6/6] 王五    23288 ms  recall=2  当然可以！首先，我建议你确保整个界面的调性是协调一致
+
+[block 3/4] 第 2 次 · MEMORY_MODE=on
+    后端就绪: mode=on model=qwen2.5:1.5b action=off
+    [1/6] 李四    14488 ms  recall=0  你好小林，很高兴认识你。我叫李四，是我们的产品经理。
+    [2/6] 李四    15980 ms  recall=2  ← 事实命中  当然记得，小林。你在做赛博小镇课程项目，感觉很有趣哦
+    [3/6] 张三    20541 ms  recall=0  我主要负责Python开发和研究，最近在写多智能体系
+    [4/6] 张三    20669 ms  recall=2  当然可以，赛博小镇项目听起来很有趣。首先，确保你已经
+    [5/6] 王五    23952 ms  recall=0  我主要负责界面设计，注重美观性和用户体验。最近在忙于
+    [6/6] 王五    23759 ms  recall=2  当然可以！为了创建一个创新的赛博小镇项目，我建议我们
+
+[block 4/4] 第 2 次 · MEMORY_MODE=off
+    后端就绪: mode=off model=qwen2.5:1.5b action=off
+    [1/6] 李四    11985 ms  recall=0  你好小林，很高兴认识你。你正在做一个赛博小镇课程项目
+    [2/6] 李四    13320 ms  recall=0  ← 未命中  当然记得，我是李四，我们是在整理需求，正忙于整理项目
+    [3/6] 张三    14936 ms  recall=0  我主要负责Python开发和多智能体系统的优化，同时
+    [4/6] 张三    21343 ms  recall=0  当然可以！首先，确保你的项目有一个明确的目标和预期结
+    [5/6] 王五    16850 ms  recall=0  我主要负责界面设计和用户体验。最近在学习如何优化移动
+    [6/6] 王五    23731 ms  recall=0  当然可以！首先，确保你的界面设计简洁易懂，符合用户操
+
+=== 汇总 ===
+记忆       样本     均值 ms     中位 ms     召回总数
+--------------------------------------------
+off      12     15879     15036        0
+on       12     19506     20246       12
+--------------------------------------------
+记忆开销倍数（均值 on/off）: 1.23×   （中位: 1.35×）
+追问事实命中: 2/4
+
+明细已写入: E:\graduate_student\AI\cybertown-eval\experiments\matrix_cpu_local_embed.csv

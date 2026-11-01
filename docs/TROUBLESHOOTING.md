@@ -223,6 +223,61 @@ grep -c "已保存到" backend/logs/dialogue_$(date +%F).log
 
 ---
 
+## 坑 9：本地 embedding 被远程参数"污染"（报"所有嵌入模型都不可用"）
+
+**现象**：`EMBED_MODEL_TYPE=local` 已设置、`sentence-transformers` 也装好了，但后端启动仍报
+`所有嵌入模型都不可用，请安装依赖或检查配置`，Agent 全部降级。
+
+**原因**：`hello_agents/memory/embedding.py` 的 `_build_embedder()` 把**所有**已配置的参数
+一次性传给三个分支：
+
+```python
+kwargs["model_name"] = model_name
+if api_key:  kwargs["api_key"] = api_key        # 来自 .env 的 DashScope 配置
+if base_url: kwargs["base_url"] = base_url      # 同上
+return create_embedding_model_with_fallback(preferred_type=preferred, **kwargs)
+```
+
+而 `LocalTransformerEmbedding.__init__(self, model_name=...)` **不接受** `api_key` / `base_url`
+→ `TypeError` → 被 `except Exception: continue` 吞掉 → 三个分支全挂 → 报"都不可用"。
+
+**最小复现**：
+
+```python
+LocalTransformerEmbedding(model_name='all-MiniLM-L6-v2', api_key='x', base_url='https://e.com')
+# TypeError: __init__() got an unexpected keyword argument 'api_key'
+```
+
+**解法**：启动前把这两个变量**置空字符串**（不是不设）：
+
+```powershell
+$env:EMBED_MODEL_TYPE='local'
+$env:EMBED_MODEL_NAME='sentence-transformers/all-MiniLM-L6-v2'
+$env:EMBED_BASE_URL=''    # 关键
+$env:EMBED_API_KEY=''     # 关键
+```
+
+## 坑 10：回退链复用 `EMBED_MODEL_NAME`，把 DashScope 的模型名塞给本地分支
+
+即使绕过坑 9，只要 `.env` 里写着 `EMBED_MODEL_NAME=text-embedding-v3`（DashScope 的名字），
+本地分支就会去加载一个叫 `text-embedding-v3` 的 sentence-transformers 模型 —— 加载不到。
+
+`hello_agents` 的默认值逻辑是：
+
+```python
+default_model = "text-embedding-v3" if preferred == "dashscope" else "sentence-transformers/all-MiniLM-L6-v2"
+model_name = os.getenv("EMBED_MODEL_NAME", default_model)
+```
+
+一旦 `.env` 显式设置了名字，按 provider 选默认值的逻辑就失效了。
+
+**解法**：`EMBED_MODEL_NAME` 必须跟着当前 provider 走；本地就写
+`sentence-transformers/all-MiniLM-L6-v2`。
+
+> 两坑叠加的典型表现是"我明明装了 sentence-transformers，它还说不可用"。
+> 排查顺序：`EMBED_MODEL_TYPE` → `EMBED_MODEL_NAME` → 两个远程变量是否为空。
+> 诊断脚本：`python tools/diag_embedding.py`（逐分支打印 traceback）。
+
 ## 一键自检
 
 `run_aup.sh` 把这些检查都固化了:

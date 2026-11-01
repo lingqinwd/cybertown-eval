@@ -113,6 +113,17 @@ def metrics_new_rows(since: int):
 
 
 # ---------------------------------------------------------------- server
+def parse_env_pairs(pairs):
+    """把 ["K=V", ...] 解析成 dict。"""
+    out = {}
+    for item in pairs or []:
+        if "=" not in item:
+            raise SystemExit(f"--env 需要 K=V 形式，收到: {item}")
+        key, value = item.split("=", 1)
+        out[key.strip()] = value
+    return out
+
+
 def start_server(args, memory_mode: str, port: int) -> subprocess.Popen:
     env = dict(os.environ)
     env.update({
@@ -125,14 +136,17 @@ def start_server(args, memory_mode: str, port: int) -> subprocess.Popen:
         "LLM_API_KEY": args.api_key,
         "LLM_TIMEOUT": str(args.llm_timeout),
         "PYTHONIOENCODING": "utf-8",
+        "PYTHONUNBUFFERED": "1",   # 否则 print 在 SIGTERM 时丢失，失败会静默
         "PYTHONUTF8": "1",
         "QDRANT_COLLECTION": args.collection,
     })
+    env.update(parse_env_pairs(args.env))
     if args.qdrant_url:
         env["QDRANT_URL"] = args.qdrant_url
     log = open(LOGS / f"matrix_server_{memory_mode}_{int(time.time())}.log", "wb")
+    python_exe = args.python or sys.executable
     return subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "main:app",
+        [python_exe, "-m", "uvicorn", "main:app",
          "--host", "127.0.0.1", "--port", str(port), "--log-level", "warning"],
         cwd=str(BACKEND), env=env, stdout=log, stderr=subprocess.STDOUT,
     )
@@ -256,6 +270,10 @@ def main() -> int:
     ap.add_argument("--collection", default="cybertown_matrix")
     ap.add_argument("--qdrant-url", default="")
     ap.add_argument("--skip-qdrant-check", action="store_true")
+    ap.add_argument("--env", action="append", default=[],
+                    help="额外环境变量 K=V，可重复；用于 EMBED_MODEL_TYPE 等")
+    ap.add_argument("--python", default="",
+                    help="启动后端用的解释器路径，默认与当前脚本相同")
     ap.add_argument("--ready-timeout", type=float, default=180.0)
     ap.add_argument("--turn-timeout", type=int, default=300)
     args = ap.parse_args()
@@ -267,6 +285,10 @@ def main() -> int:
     for i, (repeat, arm) in enumerate(plan, 1):
         print(f"  block {i}: 第 {repeat} 次 / MEMORY_MODE={arm} / {args.turns} 轮")
     print(f"  模型: {args.model_id} @ {args.base_url}")
+    if args.env:
+        print(f"  额外环境: {args.env}")
+    if args.python:
+        print(f"  后端解释器: {args.python}")
     if args.dry_run:
         return 0
 
