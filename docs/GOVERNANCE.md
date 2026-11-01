@@ -102,6 +102,25 @@ memory_manager = MemoryManager(user_id=memory_key(npc_name, player_id), ...)
 
 ---
 
+### 补记：单改记忆键并不够（探针抓到的两条额外泄露路径）
+
+第一版修复（只把记忆键改成 `(NPC, 玩家)`）在行为验证中**依然泄露** —— `probe_bob` 仍然
+说得出 `probe_alice` 的名字。深入排查后发现还有两条独立路径：
+
+| 缺陷 | 机制 | 修复 |
+|---|---|---|
+| **A. `SimpleAgent` 实例跨玩家共享** | `hello_agents/agents/simple_agent.py` 的 `run()` 会把 `self._history` 拼进 messages，而 `self.agents[npc]` 是**每个 NPC 一个实例**，所有玩家共用 | 新增 `_player_agents` 字典，按 `(NPC, 玩家)` 懒创建；基线模式仍每轮新建 |
+| **B. `auto_classify` 写入共享向量集合** | `add_memory` 默认 `auto_classify=True`，内容含「记得」等关键词就被归为 episodic；而 `EpisodicMemory` 的向量存储是 `QdrantConnectionManager` 单例（按 `url + collection` 共享，**与玩家无关**） | 两处 `add_memory` 传 `auto_classify=False`，对话记忆一律留在工作记忆 |
+
+实测数据：修复前探针用集合里有 **8 个** `memory_type=episodic` 的点；修复后 `points_count=0`，
+`probe_bob` 的回答从"记得呀，林小满，云端记忆实验"变成"你之前好像还没正式告诉过我名字呢"。
+
+原始输出：`experiments/governance/isolation_FAIL_before_fix.txt`（修复前）与
+`experiments/governance/isolation_check.txt`（修复后）。
+
+> **教训**：只做代码审查会漏掉 B —— 它藏在第三方库的默认参数里，而 `agents.py` 的调用处
+> 看起来完全正常（`memory_type="working"`）。带对照组的行为探针是必须的。
+
 ## 三、怎么验证
 
 ### 1. 单元测试（不需要模型、不需要网络）

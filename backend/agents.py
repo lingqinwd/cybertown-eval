@@ -119,6 +119,10 @@ class NPCAgentManager:
             self.llm = None
 
         self.agents: Dict[str, SimpleAgent] = {}
+        # ⭐ 按 (NPC, 玩家) 隔离的 Agent 实例。
+        # SimpleAgent 内部有 self._history，每次 run() 都会把它拼进 messages；
+        # 若所有玩家共用同一实例，先来的玩家说过的话会通过这段历史泄露给后来的玩家。
+        self._player_agents: Dict[str, SimpleAgent] = {}
         self.system_prompts: Dict[str, str] = {}
         # ⭐ 记忆管理器：(NPC, 玩家) -> MemoryManager，键由 memory_key() 生成
         self.memories: Dict[str, MemoryManager] = {}
@@ -166,6 +170,35 @@ class NPCAgentManager:
                 print(f"❌ {name} Agent创建失败: {e}")
                 self.agents[name] = None
                 self.memories[memory_key(name, DEFAULT_PLAYER_ID)] = None
+
+    def _get_agent(self, npc_name: str, player_id: str = DEFAULT_PLAYER_ID):
+        """按 (NPC, 玩家) 取 Agent 实例。
+
+        必要性：SimpleAgent 持有 ``self._history``，并在每次 ``run()`` 时把历史拼进
+        messages。如果所有玩家共用同一个 Agent，前面玩家说过的话会通过这段历史泄露给
+        后面的玩家 —— 这不是记忆系统的问题，而是 Agent 实例被复用的问题。
+
+        基线模式（MEMORY_MODE=off）仍然每轮新建，保证既无长期记忆也无进程内历史。
+        """
+        if not self.llm:
+            return None
+        role = NPC_ROLES[npc_name]
+        if not self.memory_enabled:
+            return SimpleAgent(
+                name=f"{npc_name}-{role['title']}-baseline",
+                llm=self.llm,
+                system_prompt=self.system_prompts[npc_name],
+            )
+        key = memory_key(npc_name, player_id)
+        agent = self._player_agents.get(key)
+        if agent is None:
+            agent = SimpleAgent(
+                name=f"{npc_name}-{role['title']}-{player_id}",
+                llm=self.llm,
+                system_prompt=self.system_prompts[npc_name],
+            )
+            self._player_agents[key] = agent
+        return agent
 
     def _get_memory_manager(self, npc_name: str, player_id: str = DEFAULT_PLAYER_ID):
         """按 (NPC, 玩家) 取记忆管理器，缺失时按需创建；基线模式下恒为 None。"""
@@ -221,16 +254,8 @@ class NPCAgentManager:
         if npc_name not in self.agents:
             return f"错误: NPC '{npc_name}' 不存在"
 
-        agent = self.agents[npc_name]
+        agent = self._get_agent(npc_name, player_id)
         memory_manager = self._get_memory_manager(npc_name, player_id)
-
-        # 基线模式还要隔离 SimpleAgent 的进程内聊天历史，避免短期上下文伪装成长期记忆
-        if not self.memory_enabled and self.llm is not None:
-            agent = SimpleAgent(
-                name=f"{npc_name}-{NPC_ROLES[npc_name]['title']}-baseline",
-                llm=self.llm,
-                system_prompt=self.system_prompts[npc_name],
-            )
 
         if agent is None:
             # 模拟模式回复
@@ -375,6 +400,7 @@ class NPCAgentManager:
             content=f"玩家说: {player_message}",
             memory_type="working",  # 先存入工作记忆
             importance=0.5,  # 中等重要性
+            auto_classify=False,  # 一律留在工作记忆：episodic 会写入全玩家共享的向量集合
             metadata={
                 "speaker": "player",
                 "player_id": player_id,
@@ -395,6 +421,7 @@ class NPCAgentManager:
             content=f"我说: {npc_response}",
             memory_type="working",  # 先存入工作记忆
             importance=0.6,  # 稍高重要性
+            auto_classify=False,  # 同上，避免跨玩家泄露
             metadata={
                 "speaker": npc_name,
                 "player_id": player_id,

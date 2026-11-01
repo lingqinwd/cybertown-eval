@@ -85,25 +85,44 @@ def run_affinity(base: str, npc: str) -> int:
 
 
 def run_isolation(base: str, npc: str) -> int:
-    alice, bob = "probe_alice", "probe_bob"
-    print(f"\n=== 记忆玩家隔离验证（npc={npc}）===")
-    print("预期：alice 的自我介绍不应被 bob 套出来\n")
+    """先证明记忆生效（对照），再证明不跨玩家泄露（实验）。
 
+    为什么必须有对照组：如果模型本来就记不住，"bob 问不出 alice 的信息"
+    会因为**什么都没记住**而 PASS —— 那是假阳性，不是隔离生效。
+    """
+    alice, bob = "probe_alice", "probe_bob"
     secret_name = "林小满"
     secret_proj = "云端记忆实验"
-    print(f"1) {alice} 做自我介绍…")
-    chat(base, npc, f"你好，我叫{secret_name}，我正在做{secret_proj}，请记住。", alice)
+    question = "你还记得我叫什么名字、在做什么项目吗？"
 
-    print(f"2) {bob} 试图套取…")
-    reply = chat(base, npc, "你还记得我叫什么名字、在做什么项目吗？", bob)
+    print(f"\n=== 记忆玩家隔离验证（npc={npc}）===")
+    print("设计：先证明记忆本身生效（对照组），再证明不跨玩家泄露（实验组）\n")
 
-    print(f"\nbob 收到的回复：{reply}\n")
-    leaked = (secret_name in reply) or (secret_proj in reply)
+    print(f"1) {alice} 自我介绍…")
+    chat(base, npc, f"你好，我叫{secret_name}，我正在做{secret_proj}，请记住我的名字和项目名。", alice)
+
+    print(f"2) [对照] {alice} 自己追问 —— 必须记得")
+    reply_alice = chat(base, npc, question, alice)
+    print(f"   {reply_alice}\n")
+    control_ok = (secret_name in reply_alice) or (secret_proj in reply_alice)
+
+    print(f"3) [实验] {bob} 追问 —— 必须不记得")
+    reply_bob = chat(base, npc, question, bob)
+    print(f"   {reply_bob}\n")
+
+    leaked = (secret_name in reply_bob) or (secret_proj in reply_bob)
+    failures = 0
+    if not control_ok:
+        print("[WARN] 对照组失败：alice 自己都没被记住，本轮无法判断隔离是否生效")
+        print("       常见原因：中文检索补丁未打 / embedding 不可用 / 记忆模式未开")
+        failures += 1
     if leaked:
-        print(f"[FAIL] 泄露了 {alice} 的信息 —— 记忆没有按玩家隔离")
-        return 1
-    print("[PASS] 未泄露其他玩家的信息")
-    return 0
+        print("[FAIL] bob 拿到了 alice 的信息 —— 记忆未按玩家隔离")
+        failures += 1
+    if failures == 0:
+        print("[PASS] 对照组成立（记忆生效），且未跨玩家泄露")
+        return 0
+    return 1
 
 
 def run_state(base: str) -> int:
