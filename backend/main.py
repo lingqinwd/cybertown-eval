@@ -5,7 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
 import time
-from logger import log_metrics_csv
+from pathlib import Path
+from typing import Dict
+from logger import log_metrics_csv, log_info, log_error
 
 from config import settings
 from models import (
@@ -114,6 +116,84 @@ async def runtime_config():
             "memory_mode": settings.MEMORY_MODE,
             "action_proposal": settings.ACTION_PROPOSAL}
 
+# ==================== 实验场景 ====================
+_SCENARIO_DIR = Path(__file__).resolve().parent.parent / "scenarios"
+_scenario_engine = None
+_scenario_turn = 0
+
+
+def _scenario_load(scenario_id: str):
+    """装载场景：重置世界状态并按 initial 写入。"""
+    global _scenario_engine, _scenario_turn
+    from scenario import Scenario, ScenarioEngine
+    from world_state import reset_world_state
+
+    path = _SCENARIO_DIR / f"{scenario_id}.yaml"
+    if not path.exists():
+        raise FileNotFoundError(f"场景不存在: {scenario_id}")
+    scenario = Scenario.from_yaml(path)
+    state = reset_world_state()
+    engine = ScenarioEngine(scenario, state)
+    notes = engine.load()
+    _scenario_engine = engine
+    _scenario_turn = 0
+    log_info(f"🎬 场景已装载: {scenario.scenario_id} ({scenario.turns} 轮) 初始 {notes}")
+    return scenario
+
+
+def _scenario_context_for_turn() -> str:
+    """推进场景轮到下一轮，返回要注入的环境描述。无场景时返回空串。"""
+    global _scenario_turn
+    if _scenario_engine is None:
+        return ""
+    _scenario_turn += 1
+    try:
+        plan = _scenario_engine.prepare_turn(_scenario_turn)
+    except Exception as exc:  # 场景出错不能拖垮对话
+        log_error(f"❌ 场景事件失败: {exc}")
+        return ""
+    if plan.errors:
+        log_error(f"❌ 场景事件错误: {plan.errors}")
+    if plan.applied:
+        log_info(f"🎬 第 {_scenario_turn} 轮事件: {plan.applied}")
+    return plan.context
+
+
+@app.post("/scenario/load")
+async def scenario_load(payload: Dict[str, str]):
+    """装载一个场景（会重置世界状态）。"""
+    scenario_id = (payload or {}).get("id", "").strip()
+    if not scenario_id:
+        raise HTTPException(status_code=400, detail="缺少 id")
+    try:
+        scenario = _scenario_load(scenario_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"场景装载失败: {exc}")
+    return {"loaded": True, "scenario": scenario.to_dict()}
+
+
+@app.get("/scenario/state")
+async def scenario_state():
+    """当前场景进度与判据。"""
+    if _scenario_engine is None:
+        return {"active": False}
+    data = _scenario_engine.summary()
+    data["active"] = True
+    data["current_turn"] = _scenario_turn
+    return data
+
+
+@app.post("/scenario/reset")
+async def scenario_reset():
+    """卸载场景（状态保留为当前值）。"""
+    global _scenario_engine, _scenario_turn
+    _scenario_engine = None
+    _scenario_turn = 0
+    return {"active": False}
+
+
 # ==================== 权威世界状态 ====================
 @app.get("/world/state")
 async def get_world_state_view(player_id: str = "player"):
@@ -168,7 +248,9 @@ async def chat_with_npc(request: ChatRequest):
     try:
         started = time.perf_counter()
         # 调用NPC Agent处理对话
-        response_text = npc_mgr.chat(request.npc_name, request.message, request.player_id)
+        scenario_context = _scenario_context_for_turn()
+        response_text = npc_mgr.chat(request.npc_name, request.message,
+                                     request.player_id, scenario_context)
         elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
         metrics = dict(getattr(npc_mgr, "last_metrics", {}))
         metrics["latency_ms"] = elapsed_ms

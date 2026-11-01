@@ -128,6 +128,7 @@ Godot 需要显示器、后端需要 GPU，演示时两端天然分离。但 Jup
 | [experiments/README.md](experiments/README.md) | 数据文件说明与口径陷阱 |
 | [experiments/MATRIX_REPLICATION.md](experiments/MATRIX_REPLICATION.md) | 本地 A-B-B-A 复现与受控对照（含一次被推翻的结论） |
 | [experiments/STAGE_TIMING.md](experiments/STAGE_TIMING.md) | 延迟分阶段分解，以及那个 2 秒假开销的定位过程 |
+| [docs/SCENARIO.md](docs/SCENARIO.md) | **可重复实验场景**：数据驱动的扰动 + 判据，含三个内置场景与实测 |
 | [tools/README.md](tools/README.md) | **13 个脚本的索引**：跑实验 / 定位问题 / 部署联调 |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | 本地与 AUP 部署 |
 | [docs/MODEL_SWITCHING.md](docs/MODEL_SWITCHING.md) | 云端 / 端侧模型切换 |

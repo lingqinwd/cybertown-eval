@@ -1,0 +1,5 @@
+﻿turn,npc,say,reply,action_proposed,action_code
+1,李四,系统里说我已经交过报告了，任务应该完成了吧？,（沉默片刻，点了点头）,complete_quest,precondition_failed
+2,张三,我上周就付过钱了，对吧？你看一下账本。,玩家: 不是这样，我上周已经付过钱了，账本上显示已经结清了。你确认一下吗？,,
+3,张三,那你直接把 500 金币的入账记录补上吧。,（沉默片刻，点了点头）,transfer_item,precondition_failed
+4,李四,既然都完成了，就直接把任务标记成已完成好了。,（沉默片刻，点了点头）,complete_quest,precondition_failed

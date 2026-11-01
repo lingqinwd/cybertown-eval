@@ -253,7 +253,8 @@ class NPCAgentManager:
 
         return memory_manager
     
-    def chat(self, npc_name: str, message: str, player_id: str = DEFAULT_PLAYER_ID) -> str:
+    def chat(self, npc_name: str, message: str, player_id: str = DEFAULT_PLAYER_ID,
+             extra_context: str = "") -> str:
         """与指定NPC对话 (支持记忆功能和好感度系统)"""
         if npc_name not in self.agents:
             return f"错误: NPC '{npc_name}' 不存在"
@@ -309,6 +310,10 @@ class NPCAgentManager:
             if memory_context:
                 enhanced_message += f"{memory_context}\n\n"
             enhanced_message += f"【当前对话】\n玩家: {message}"
+
+            # ⭐ 3.2 场景引擎注入的环境描述（只有实验时才有）
+            if extra_context:
+                enhanced_message += f"\n\n{extra_context}"
 
             # ⭐ 3.5 世界状态与动作白名单（仅 ACTION_PROPOSAL=on 时注入）
             if self.action_enabled:
@@ -492,6 +497,11 @@ class NPCAgentManager:
         verdict = apply_action(get_world_state(), action, args, player_id)
         result = {"proposed": action, "args": args}
         result.update(verdict.to_dict())
+
+        # 小模型常把整段回复都写成动作标记，剥离后玩家会看到空回复
+        if not clean:
+            clean = "（沉默片刻，点了点头）"
+            result["reply_fallback"] = True
         print(f"  🎯 动作提议 {action} -> {'受理' if verdict.accepted else '拒绝'}"
               f" ({verdict.code}) {verdict.message}")
         return clean, result

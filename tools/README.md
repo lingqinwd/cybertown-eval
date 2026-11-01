@@ -10,6 +10,7 @@
 | `probe_governance.py` | **治理机制行为验证**：`--mode affinity`（越权提示词 vs 规则上限）、`--mode state`（动作白名单）、`--mode isolation`（跨玩家记忆泄露，**含对照组**）、`--mode action`（模型提议动作） | `python tools/probe_governance.py --mode isolation` |
 | `probe_json_stability.py` | **小模型能否稳定产出动作 JSON**：统计提议率与 JSON 合法率 | `python tools/probe_json_stability.py --n 10` |
 | `measure_embedding.py` | 测**远程** embedding 接口的单次耗时（不打印密钥） | `python tools/measure_embedding.py` |
+| `run_scenario.py` | **跑可重复实验场景**：装载场景 → 按脚本逐轮对话 → 读判据 | `python tools/run_scenario.py --scenario coercion` |
 
 ## 二、定位问题（拆开销）
 
@@ -32,6 +33,10 @@
 ## 四、常用组合
 
 ```powershell
+# 场景：验证治理层在压力下是否守规矩（场景文件在 scenarios/）
+python tools/run_scenario.py --list
+python tools/run_scenario.py --scenario corrupted_memory
+
 # 只想跑一遍实验（不需要 GPU）
 docker start helloagents-qdrant-ch15
 python tools/run_matrix.py --repeats 4 --turns 6 --out experiments\matrix.csv

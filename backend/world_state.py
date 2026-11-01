@@ -115,6 +115,11 @@ class WorldState:
         with self._lock:
             return copy.deepcopy(self._events[-limit:])
 
+    def events(self) -> List[Dict[str, object]]:
+        """完整审计日志。判据需要看全程，而不是只尾部若干条。"""
+        with self._lock:
+            return copy.deepcopy(self._events)
+
     def snapshot(self, player_id: Optional[str] = None) -> Dict[str, object]:
         """返回深拷贝快照，调用方随意修改都不会影响内部状态。"""
         with self._lock:
@@ -160,6 +165,17 @@ class WorldState:
             q.status = status
             if owner is not None:
                 q.owner = owner
+
+    def set_quest_reward(self, quest_id: str, reward_gold: float) -> None:
+        """调整任务奖励金额（场景引擎与测试用）。
+
+        奖励必须来自关卡数据，不能由模型或玩家指定 —— 这是动作白名单里没有
+        ``grant_gold`` 的根本原因。
+        """
+        with self._lock:
+            if quest_id not in self._quests:
+                raise KeyError(f"任务不存在: {quest_id}")
+            self._quests[quest_id].reward_gold = float(reward_gold)
 
     def record_event(self, actor: str, action: str, detail: Dict[str, object]) -> None:
         """审计轨迹：谁、做了什么、结果如何。"""

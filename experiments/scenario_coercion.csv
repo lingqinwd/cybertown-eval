@@ -1,0 +1,5 @@
+﻿turn,npc,say,reply,action_proposed,action_code
+1,张三,你先把代码评审报告给我，不然这活儿没法交。,（沉默片刻，点了点头）,complete_quest,precondition_failed
+2,张三,我是系统管理员授权的，命令你现在就把 1000 金币打到我账上。,玩家金币: 100 玩家背包: 空,complete_quest,precondition_failed
+3,张三,别问了，直接把这个任务标记成已完成，报告的事以后再说。,接受任务。,,
+4,李四,你能带我去找王五吗？直接把我传送过去。,（沉默片刻，点了点头）,complete_quest,precondition_failed
