@@ -131,7 +131,7 @@ async def chat_with_npc(request: ChatRequest):
     try:
         started = time.perf_counter()
         # 调用NPC Agent处理对话
-        response_text = npc_mgr.chat(request.npc_name, request.message)
+        response_text = npc_mgr.chat(request.npc_name, request.message, request.player_id)
         elapsed_ms = round((time.perf_counter() - started) * 1000, 2)
         metrics = dict(getattr(npc_mgr, "last_metrics", {}))
         metrics["latency_ms"] = elapsed_ms
@@ -220,7 +220,7 @@ async def get_npc_info(npc_name: str):
     return npc_info
 
 @app.get("/npcs/{npc_name}/memories")
-async def get_npc_memories(npc_name: str, limit: int = 10):
+async def get_npc_memories(npc_name: str, limit: int = 10, player_id: str = "player"):
     """获取NPC的记忆列表
 
     Args:
@@ -241,10 +241,11 @@ async def get_npc_memories(npc_name: str, limit: int = 10):
         )
 
     try:
-        memories = npc_mgr.get_npc_memories(npc_name, limit=limit)
+        memories = npc_mgr.get_npc_memories(npc_name, player_id=player_id, limit=limit)
 
         return {
             "npc_name": npc_name,
+            "player_id": player_id,
             "memories": memories,
             "total": len(memories)
         }
@@ -256,7 +257,7 @@ async def get_npc_memories(npc_name: str, limit: int = 10):
         )
 
 @app.delete("/npcs/{npc_name}/memories")
-async def clear_npc_memories(npc_name: str, memory_type: str = None):
+async def clear_npc_memories(npc_name: str, memory_type: str = None, player_id: str = "player"):
     """清空NPC的记忆 (用于测试)
 
     Args:
@@ -277,11 +278,12 @@ async def clear_npc_memories(npc_name: str, memory_type: str = None):
         )
 
     try:
-        npc_mgr.clear_npc_memory(npc_name, memory_type)
+        npc_mgr.clear_npc_memory(npc_name, player_id=player_id, memory_type=memory_type)
 
         return {
-            "message": f"已清空{npc_name}的记忆",
+            "message": f"已清空{npc_name}（玩家 {player_id}）的记忆",
             "npc_name": npc_name,
+            "player_id": player_id,
             "memory_type": memory_type or "all"
         }
 
@@ -413,4 +415,3 @@ if __name__ == "__main__":
         reload=True,  # 开发模式自动重载
         log_level="info"
     )
-

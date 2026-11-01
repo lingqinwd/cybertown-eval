@@ -93,12 +93,36 @@ Godot 需要显示器、后端需要 GPU，演示时两端天然分离。但 Jup
 |---|---|
 | [docs/EXPERIMENT_RESULTS.md](docs/EXPERIMENT_RESULTS.md) | 四组完整结果、延迟归因、失效模式、局限 |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | 端侧部署踩过的 8 个坑与修复（**建议先读**） |
+| [docs/GOVERNANCE.md](docs/GOVERNANCE.md) | 权威状态与玩家隔离：好感度规则层、记忆按玩家隔离 |
+| [docs/ROADMAP.md](docs/ROADMAP.md) | 四个候选机制的设计、依赖、验证方案与本地部署评估 |
 | [docs/LOCAL_CLIENT_REMOTE_BACKEND.md](docs/LOCAL_CLIENT_REMOTE_BACKEND.md) | 本地客户端 + 远程后端的演示链路 |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 系统架构与实验开关 |
 | [docs/CLASS_PRESENTATION_3MIN.md](docs/CLASS_PRESENTATION_3MIN.md) | 3 分钟课堂汇报稿 |
 | [experiments/README.md](experiments/README.md) | 数据文件说明与口径陷阱 |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | 本地与 AUP 部署 |
 | [docs/MODEL_SWITCHING.md](docs/MODEL_SWITCHING.md) | 云端 / 端侧模型切换 |
+
+## 权威状态与玩家隔离
+
+系统里曾有两处把**状态的主权交给了语言模型**，现已修复（细节见 [docs/GOVERNANCE.md](docs/GOVERNANCE.md)）：
+
+| 缺陷 | 修复 |
+|---|---|
+| 好感度由模型直接决定，玩家可用话术一次推满 | `backend/rules.py`：模型只提议，后端按 R0–R4 规则裁决 |
+| 记忆按 NPC 隔离，两个玩家会串 | 记忆键改为 `(NPC, 玩家)`，存储路径 `memory_data/<npc>/<player>/` |
+
+验证方式（都不需要 GPU）：
+
+```bash
+python tests/test_affinity_rules.py                        # 15 个规则层单测
+python tools/probe_governance.py --mode affinity           # 注入越权提示词看是否被截断
+python tools/probe_governance.py --mode isolation          # 验证跨玩家记忆不泄露
+```
+
+规则层触发时会把 `affinity_proposed` / `affinity_rule_status` / `affinity_rule_notes`
+写进 `metrics_*.csv`，因此"模型提议了多少、规则放行多少"是可统计的。
+
+四个更大机制的现状、依赖关系与验证方案见 [docs/ROADMAP.md](docs/ROADMAP.md)。
 
 ## 复现要点
 

@@ -105,8 +105,10 @@ def log_dialogue_end():
 
 def log_metrics_csv(metrics: dict):
     """将每轮可比较指标写入结构化 CSV。"""
-    fields = ["timestamp", "model_profile", "mode", "npc", "message", "latency_ms", "memory_recall_count",
-              "affinity_before", "affinity_after", "request_failed"]
+    fields = ["timestamp", "model_profile", "mode", "npc", "player_id", "message", "latency_ms",
+              "memory_recall_count", "affinity_before", "affinity_after",
+              "affinity_proposed", "affinity_rule_status", "affinity_rule_notes",
+              "request_failed"]
     exists = METRICS_FILE.exists()
     with METRICS_FILE.open("a", encoding="utf-8-sig", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fields)
@@ -125,4 +127,3 @@ def log_error(message: str):
 # 启动时记录日志文件位置
 print(f"\n📝 对话日志文件: {LOG_FILE}")
 print(f"📂 日志目录: {LOGS_DIR}\n")
-

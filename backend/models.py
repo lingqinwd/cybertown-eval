@@ -8,12 +8,14 @@ class ChatRequest(BaseModel):
     """单个NPC对话请求"""
     npc_name: str = Field(..., description="NPC名称")
     message: str = Field(..., description="玩家消息")
+    player_id: str = Field(default="player", description="玩家ID（记忆与好感度按此隔离）")
     
     class Config:
         json_schema_extra = {
             "example": {
                 "npc_name": "张三",
-                "message": "你好,你在做什么?"
+                "message": "你好,你在做什么?",
+                "player_id": "player"
             }
         }
 
@@ -66,4 +68,3 @@ class NPCListResponse(BaseModel):
     """NPC列表响应"""
     npcs: List[NPCInfo] = Field(..., description="NPC列表")
     total: int = Field(..., description="NPC总数")
-

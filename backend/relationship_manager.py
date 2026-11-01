@@ -11,6 +11,8 @@ from typing import Dict, Optional, Tuple
 import json
 import re
 
+from rules import evaluate_affinity_change
+
 class RelationshipManager:
     """NPC好感度管理器
     
@@ -170,29 +172,38 @@ NPC: "当然可以!我很乐意分享。"
             analysis = self._parse_analysis(response)
             
             if analysis["should_change"]:
-                # 更新好感度
+                # ⭐ LLM 只负责"提议"，是否生效由 rules.py 的确定性规则裁决
                 current_affinity = self.get_affinity(npc_name, player_id)
-                new_affinity = current_affinity + analysis["change_amount"]
-                new_affinity = max(0.0, min(100.0, new_affinity))  # 限制在0-100
+                sentiment = analysis.get("sentiment", "neutral")
+                verdict = evaluate_affinity_change(
+                    current=current_affinity,
+                    proposed_delta=analysis["change_amount"],
+                    sentiment=sentiment,
+                    reason=analysis.get("reason", ""),
+                )
 
-                self.set_affinity(npc_name, new_affinity, player_id)
+                if verdict.changed:
+                    self.set_affinity(npc_name, verdict.new_value, player_id)
 
-                # 获取好感度等级
-                old_level = self.get_affinity_level(current_affinity)
-                new_level = self.get_affinity_level(new_affinity)
+                old_level = self.get_affinity_level(verdict.current)
+                new_level = self.get_affinity_level(verdict.new_value)
 
-                # 注意: 打印日志已移到agents.py中,避免重复输出
+                if verdict.notes:
+                    print(f"  🛡️ 好感度规则[{verdict.status}]: {'; '.join(verdict.notes)}")
 
-                return {
-                    "changed": True,
-                    "old_affinity": current_affinity,
-                    "new_affinity": new_affinity,
-                    "change_amount": analysis["change_amount"],
+                result = {
+                    "changed": verdict.changed,
+                    "old_affinity": verdict.current,
+                    "new_affinity": verdict.new_value,
+                    "change_amount": verdict.applied_delta,
+                    "proposed_change": verdict.proposed_delta,
                     "reason": analysis["reason"],
-                    "sentiment": analysis.get("sentiment", "neutral"),
+                    "sentiment": sentiment,
                     "old_level": old_level,
-                    "new_level": new_level
+                    "new_level": new_level,
                 }
+                result.update(verdict.as_dict())
+                return result
             else:
                 return {
                     "changed": False,
@@ -321,4 +332,3 @@ NPC: "当然可以!我很乐意分享。"
                 "modifier": self.get_affinity_modifier(affinity)
             }
         return result
-

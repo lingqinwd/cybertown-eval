@@ -84,6 +84,18 @@ def create_system_prompt(name: str, role: Dict[str, str]) -> str:
 - 回复要有人情味,不要太机械
 """
 
+DEFAULT_PLAYER_ID = "player"
+
+
+def memory_key(npc_name: str, player_id: str) -> str:
+    """记忆管理器的键：按 (NPC, 玩家) 二元组隔离。
+
+    旧实现只按 NPC 隔离（MemoryManager(user_id=npc_name)），多个玩家会共用同一份
+    记忆 —— 后一个玩家能召回前一个玩家说过的话，构成跨玩家信息泄露。
+    """
+    return f"{npc_name}::{player_id or DEFAULT_PLAYER_ID}"
+
+
 class NPCAgentManager:
     """NPC Agent管理器 - 支持记忆功能"""
 
@@ -108,7 +120,8 @@ class NPCAgentManager:
 
         self.agents: Dict[str, SimpleAgent] = {}
         self.system_prompts: Dict[str, str] = {}
-        self.memories: Dict[str, MemoryManager] = {}  # ⭐ NPC记忆管理器
+        # ⭐ 记忆管理器：(NPC, 玩家) -> MemoryManager，键由 memory_key() 生成
+        self.memories: Dict[str, MemoryManager] = {}
         self.memory_enabled = settings.MEMORY_MODE in ("on", "true", "1", "enabled")
         self.last_metrics: Dict[str, object] = {}
         self.relationship_manager: Optional[RelationshipManager] = None  # ⭐ 好感度管理器
@@ -141,8 +154,10 @@ class NPCAgentManager:
                 self.agents[name] = agent
 
                 # 基线模式完全不创建记忆管理器，避免 WorkingMemory/SQLite/Qdrant 参与实验
-                memory_manager = self._create_memory_manager(name) if self.memory_enabled else None
-                self.memories[name] = memory_manager
+                # 默认玩家在启动时预建，其他玩家在首次对话时按需创建
+                self.memories[memory_key(name, DEFAULT_PLAYER_ID)] = (
+                    self._create_memory_manager(name, DEFAULT_PLAYER_ID) if self.memory_enabled else None
+                )
 
                 mode_label = "记忆系统已启用" if self.memory_enabled else "无长期记忆基线"
                 print(f"✅ {name}({role['title']}) Agent创建成功 ({mode_label})")
@@ -150,12 +165,31 @@ class NPCAgentManager:
             except Exception as e:
                 print(f"❌ {name} Agent创建失败: {e}")
                 self.agents[name] = None
-                self.memories[name] = None
+                self.memories[memory_key(name, DEFAULT_PLAYER_ID)] = None
 
-    def _create_memory_manager(self, npc_name: str) -> MemoryManager:
-        """为NPC创建记忆管理器"""
+    def _get_memory_manager(self, npc_name: str, player_id: str = DEFAULT_PLAYER_ID):
+        """按 (NPC, 玩家) 取记忆管理器，缺失时按需创建；基线模式下恒为 None。"""
+        if not self.memory_enabled:
+            return None
+        key = memory_key(npc_name, player_id)
+        if key in self.memories:
+            return self.memories[key]
+        try:
+            self.memories[key] = self._create_memory_manager(npc_name, player_id)
+        except Exception as e:  # 单个玩家初始化失败不应拖垮整个 NPC
+            print(f"❌ {npc_name}/{player_id} 记忆初始化失败: {e}")
+            self.memories[key] = None
+        return self.memories[key]
+
+    def _create_memory_manager(self, npc_name: str, player_id: str = DEFAULT_PLAYER_ID) -> MemoryManager:
+        """为 (NPC, 玩家) 创建记忆管理器
+
+        存储路径 memory_data/<npc>/<player>/，与 user_id 一一对应，保证物理隔离。
+        """
         # 创建记忆存储目录
-        memory_dir = os.path.join(os.path.dirname(__file__), 'memory_data', npc_name)
+        memory_dir = os.path.join(
+            os.path.dirname(__file__), 'memory_data', npc_name, player_id or DEFAULT_PLAYER_ID
+        )
         os.makedirs(memory_dir, exist_ok=True)
 
         # 配置记忆系统
@@ -171,7 +205,7 @@ class NPCAgentManager:
         # 创建记忆管理器
         memory_manager = MemoryManager(
             config=memory_config,
-            user_id=npc_name,  # 使用NPC名字作为user_id
+            user_id=memory_key(npc_name, player_id),  # (NPC, 玩家) 复合键，避免跨玩家串记忆
             enable_working=True,  # 启用工作记忆 (短期)
             enable_episodic=True,  # 启用情景记忆 (长期)
             enable_semantic=False,  # 不需要语义记忆
@@ -182,13 +216,13 @@ class NPCAgentManager:
 
         return memory_manager
     
-    def chat(self, npc_name: str, message: str, player_id: str = "player") -> str:
+    def chat(self, npc_name: str, message: str, player_id: str = DEFAULT_PLAYER_ID) -> str:
         """与指定NPC对话 (支持记忆功能和好感度系统)"""
         if npc_name not in self.agents:
             return f"错误: NPC '{npc_name}' 不存在"
 
         agent = self.agents[npc_name]
-        memory_manager = self.memories.get(npc_name)
+        memory_manager = self._get_memory_manager(npc_name, player_id)
 
         # 基线模式还要隔离 SimpleAgent 的进程内聊天历史，避免短期上下文伪装成长期记忆
         if not self.memory_enabled and self.llm is not None:
@@ -276,10 +310,14 @@ class NPCAgentManager:
                 "model_profile": settings.MODEL_PROFILE,
                 "mode": "memory_on" if self.memory_enabled else "memory_off",
                 "npc": npc_name,
+                "player_id": player_id,
                 "message": message,
                 "memory_recall_count": len(relevant_memories),
                 "affinity_before": affinity_result.get("old_affinity", affinity_result.get("affinity", 50.0)),
                 "affinity_after": affinity_result.get("new_affinity", affinity_result.get("affinity", 50.0)),
+                "affinity_proposed": affinity_result.get("proposed_change", ""),
+                "affinity_rule_status": affinity_result.get("rule_status", ""),
+                "affinity_rule_notes": affinity_result.get("rule_notes", ""),
                 "request_failed": False,
             }
 
@@ -391,12 +429,9 @@ class NPCAgentManager:
         """获取所有NPC信息"""
         return [self.get_npc_info(name) for name in NPC_ROLES.keys()]
 
-    def get_npc_memories(self, npc_name: str, player_id: str = "player", limit: int = 10) -> List[Dict]:
-        """获取NPC的记忆列表 (用于调试和展示)"""
-        if npc_name not in self.memories:
-            return []
-
-        memory_manager = self.memories[npc_name]
+    def get_npc_memories(self, npc_name: str, player_id: str = DEFAULT_PLAYER_ID, limit: int = 10) -> List[Dict]:
+        """获取指定玩家与指定 NPC 之间的记忆列表 (用于调试和展示)"""
+        memory_manager = self.memories.get(memory_key(npc_name, player_id))
         if not memory_manager:
             return []
 
@@ -426,15 +461,12 @@ class NPCAgentManager:
             print(f"❌ 获取{npc_name}记忆失败: {e}")
             return []
 
-    def clear_npc_memory(self, npc_name: str, memory_type: Optional[str] = None):
-        """清空NPC的记忆 (用于测试)"""
-        if npc_name not in self.memories:
-            print(f"❌ NPC '{npc_name}' 不存在")
-            return
-
-        memory_manager = self.memories[npc_name]
+    def clear_npc_memory(self, npc_name: str, player_id: str = DEFAULT_PLAYER_ID,
+                         memory_type: Optional[str] = None):
+        """清空指定玩家与指定 NPC 之间的记忆 (用于测试)"""
+        memory_manager = self.memories.get(memory_key(npc_name, player_id))
         if not memory_manager:
-            print(f"❌ {npc_name}没有记忆系统")
+            print(f"❌ {npc_name}/{player_id} 没有记忆系统")
             return
 
         try:
@@ -520,4 +552,3 @@ def get_npc_manager() -> NPCAgentManager:
     if _npc_manager is None:
         _npc_manager = NPCAgentManager()
     return _npc_manager
-
