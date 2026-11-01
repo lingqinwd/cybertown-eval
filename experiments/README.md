@@ -22,6 +22,7 @@
 | `matrix_cpu_local_embed.csv` | C：CPU + 本地 embedding，2 次 | 服务端 | 24 轮，比值 1.23×（**含 2 s 假开销，仅供翻车留证**） |
 | `matrix_fixed_local_embed.csv` | **修正后**：GPU + 本地 embedding | 服务端 | 倍数 **1.12×**，retrieve 44 ms |
 | `matrix_fixed_remote_embed.csv` | **修正后**：GPU + 远程 embedding | 服务端 | 倍数 **2.10×**，retrieve 1112 ms |
+| `matrix_fixed_cpu_local_embed.csv` | **修正后**：CPU + 本地 embedding | 服务端 | 倍数 **1.12×**，retrieve 64 ms；**affinity 阶段最贵（11.2 s）** |
 | `STAGE_TIMING.md` | — | — | **分阶段计时、2 s 假开销的定位过程与教训** |
 
 > 端侧(C/D)的**客户端端到端延迟**单独保存在 `.turns.csv` 中,由浏览器控制台脚本导出,未纳入本仓库。如需完整重跑,脚本思路见 [../docs/EXPERIMENT_RESULTS.md](../docs/EXPERIMENT_RESULTS.md) §1。

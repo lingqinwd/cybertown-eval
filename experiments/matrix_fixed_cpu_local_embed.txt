@@ -1,0 +1,62 @@
+=== 计划 ===
+  block 1: 第 1 次 / MEMORY_MODE=off / 6 轮
+  block 2: 第 1 次 / MEMORY_MODE=on / 6 轮
+  block 3: 第 2 次 / MEMORY_MODE=on / 6 轮
+  block 4: 第 2 次 / MEMORY_MODE=off / 6 轮
+  模型: qwen2.5:1.5b @ http://127.0.0.1:11434/v1
+  额外环境: ['EMBED_MODEL_TYPE=local', 'EMBED_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2', 'EMBED_BASE_URL=', 'EMBED_API_KEY=', 'QDRANT_URL=http://127.0.0.1:6333', 'HF_HOME=D:\\HFCache', 'HF_ENDPOINT=https://hf-mirror.com']
+  Qdrant 可用: http://127.0.0.1:6333
+  旧 metrics 已归档: metrics_2026-11-01_180151.csv
+
+[block 1/4] 第 1 次 · MEMORY_MODE=off
+    后端就绪: mode=off model=qwen2.5:1.5b action=off
+    [1/6] 李四    11948 ms  recall=0  你好，小林。很高兴认识你。我叫李四，是你们项目的负责
+    [2/6] 李四    12997 ms  recall=0  ← 未命中  你好！我是Datawhale的产品经理李四，我们最近
+    [3/6] 张三    13747 ms  recall=0  你好！我主要负责Python的开发和代码优化工作。近
+    [4/6] 张三    21393 ms  recall=0  当然可以！首先，确保你的赛博小镇项目有明确的定义和目
+    [5/6] 王五    15851 ms  recall=0  我主要负责界面设计和用户体验的工作，专注于提升产品的
+    [6/6] 王五    23412 ms  recall=0  当然可以，赛博小镇项目听起来是个有趣的想法。你可以考
+
+[block 2/4] 第 1 次 · MEMORY_MODE=on
+    后端就绪: mode=on model=qwen2.5:1.5b action=off
+    [1/6] 李四    12079 ms  recall=0  你好小林，很高兴认识你。你的项目听起来很有趣，赛博小
+    [2/6] 李四    15373 ms  recall=2  ← 事实命中  当然记得，我叫李四，正在做赛博小镇项目的项目管理。你
+    [3/6] 张三    14893 ms  recall=0  我主要负责Python开发，尤其是多智能体系统和He
+    [4/6] 张三    25746 ms  recall=2  当然可以！你最近在开发的赛博小镇项目，我注意到你使用
+    [5/6] 王五    18789 ms  recall=0  我主要负责界面设计和用户体验。最近在尝试新的设计风格
+    [6/6] 王五    30454 ms  recall=2  当然可以！我建议你可以借鉴一些现代城市的外观设计，比
+
+[block 3/4] 第 2 次 · MEMORY_MODE=on
+    后端就绪: mode=on model=qwen2.5:1.5b action=off
+    [1/6] 李四    12987 ms  recall=0  你好小林，很高兴认识你。是的，我叫李四，我在Data
+    [2/6] 李四    17279 ms  recall=2  ← 事实命中  当然记得，我叫李四，我在Datawhale办公室工作
+    [3/6] 张三    21502 ms  recall=0  我主要负责Python开发和多智能体系统的开发。最近
+    [4/6] 张三    21714 ms  recall=2  当然可以！首先，确保你的项目有清晰的目标和可实现的方
+    [5/6] 王五    24628 ms  recall=0  我主要负责界面设计、交互设计和视觉呈现，致力于提升用
+    [6/6] 王五    25812 ms  recall=2  当然可以，我了解到你的项目需要在赛博小镇中实现一种复
+
+[block 4/4] 第 2 次 · MEMORY_MODE=off
+    后端就绪: mode=off model=qwen2.5:1.5b action=off
+    [1/6] 李四    12494 ms  recall=0  你好小林，非常乐意帮忙。请问你目前在开发的赛博小镇课
+    [2/6] 李四    14267 ms  recall=0  ← 未命中  当然记得！你的名字是李四，你在做的项目是整理需求。很
+    [3/6] 张三    16797 ms  recall=0  我主要负责多智能体系统的开发和研究。最近在用Hell
+    [4/6] 张三    24715 ms  recall=0  当然可以！首先，确保你的多智能体系统设计中包含了良好
+    [5/6] 王五    19469 ms  recall=0  我主要负责界面设计、交互设计和视觉呈现。我致力于创造
+    [6/6] 王五    28468 ms  recall=0  当然可以！首先，我们需要了解你的项目目标和用户群体。
+
+=== 汇总 ===
+记忆       样本     均值 ms     中位 ms     召回总数
+--------------------------------------------
+off      12     17963     16324        0
+on       12     20105     20145       12
+--------------------------------------------
+记忆开销倍数（均值 on/off）: 1.12×   （中位: 1.23×）
+
+=== 阶段分解（服务端计时，均值 ms）===
+记忆       retrieve    contexms    generate    affinity        save    prompt字符        回复字符
+------------------------------------------------------------------------------------------------
+off             0           0        5161       11179           0          84          74
+on             64           0        6518       11665           0         141          85
+追问事实命中: 2/4
+
+明细已写入: E:\graduate_student\AI\cybertown-eval\experiments\matrix_fixed_cpu_local_embed.csv
