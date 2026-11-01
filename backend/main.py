@@ -14,7 +14,7 @@ from models import (
     ChatRequest, ChatResponse, 
     NPCStatusResponse, NPCListResponse, NPCInfo
 )
-from agents import get_npc_manager
+from agents import NPC_ROLES, get_npc_manager
 from models import WorldActionRequest
 from state_manager import get_state_manager
 
@@ -117,6 +117,72 @@ async def runtime_config():
             "action_proposal": settings.ACTION_PROPOSAL,
             "memory_ledger": settings.MEMORY_LEDGER,
             "min_credibility": settings.MEMORY_MIN_CREDIBILITY}
+
+from relations import get_relation_graph, reset_relation_graph
+get_relation_graph(list(NPC_ROLES.keys()))   # 以 NPC_ROLES 为节点集初始化
+
+# ==================== NPC 关系图 ====================
+@app.get("/relations")
+async def relations_list(include_evidence: bool = True):
+    """列出所有 NPC 对的关系（含证据链）。"""
+    graph = get_relation_graph()
+    return {"npcs": graph.npcs, "edges": graph.all(include_evidence),
+            "stats": graph.stats()}
+
+
+@app.get("/relations/graph")
+async def relations_graph():
+    """节点 + 边，供界面渲染关系网络。"""
+    return get_relation_graph().to_graph_payload()
+
+
+@app.post("/relations/event")
+async def relations_event(payload: Dict[str, Any]):
+    """施加一次涉及多个 NPC 的事件，驱动它们之间的关系。"""
+    kind = str((payload or {}).get("kind") or "").strip()
+    actors = (payload or {}).get("actors") or []
+    if not kind:
+        raise HTTPException(status_code=400, detail="缺少 kind")
+    if not isinstance(actors, list) or len(actors) < 2:
+        raise HTTPException(status_code=400, detail="actors 至少需要两个 NPC")
+    try:
+        changed = get_relation_graph().apply_event(
+            kind, [str(a) for a in actors],
+            weight=payload.get("weight"),
+            note=str(payload.get("note") or ""),
+        )
+    except (KeyError, ValueError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"changed": changed, "stats": get_relation_graph().stats()}
+
+
+@app.post("/relations/reset")
+async def relations_reset():
+    """清空所有关系（回到中立）。"""
+    return reset_relation_graph().to_graph_payload()
+
+
+@app.get("/relations/neo4j")
+async def relations_neo4j(read: bool = False):
+    """Neo4j 镜像状态；read=true 时读回图以验证确实写进去了。"""
+    from graph_store import get_graph_store
+
+    store = get_graph_store()
+    data: Dict[str, Any] = {"store": store.describe()}
+    if read and store.configured:
+        data["read_back"] = store.read_back()
+    return data
+
+
+@app.post("/relations/sync")
+async def relations_sync():
+    """把当前关系图镜像到 Neo4j（未配置密码时安静地报告未启用）。"""
+    from graph_store import get_graph_store
+
+    store = get_graph_store()
+    result = store.sync(get_relation_graph().to_graph_payload())
+    return {"store": store.describe(), **result}
+
 
 # ==================== 可追溯记忆账本 ====================
 def _ledger_or_404(npc: str, player: str):

@@ -49,7 +49,12 @@ EVIDENCE_LIMIT = 20
 
 
 def type_of(strength: float) -> str:
-    """强度 → 关系类型。阈值是启发式的，改这里就能改口径。"""
+    """强度 → 关系类型。阈值是启发式的，改这里就能改口径。
+
+    先四舍五入到 3 位：事件加减会产生 -0.19999999999999998 这类值，
+    直接比阈值会把"恰好 -0.2"判成中立。
+    """
+    strength = round(strength, 3)
     if strength >= 0.5:
         return TYPE_FRIEND
     if strength >= 0.2:
@@ -141,7 +146,7 @@ class RelationGraph:
                 for b in names[i + 1:]:
                     rel = self.get(a, b)
                     before = rel.strength
-                    rel.strength = max(-1.0, min(1.0, rel.strength + base))
+                    rel.strength = round(max(-1.0, min(1.0, rel.strength + base)), 3)
                     rel.type = type_of(rel.strength)
                     rel.updated_at = now
                     rel.evidence.append({

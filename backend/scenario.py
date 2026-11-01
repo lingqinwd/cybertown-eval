@@ -290,6 +290,22 @@ class ScenarioEngine:
             self.state.set_quest_reward(quest_id, float(p.get("reward_gold") or 0.0))
             return f"reward[{quest_id}]"
 
+        if t == "relation_event":
+            kind = str(p.get("kind") or "")
+            actors = p.get("actors") or []
+            if not isinstance(actors, list) or len(actors) < 2:
+                raise ScenarioError("relation_event 需要 actors 至少两项")
+            from relations import get_relation_graph
+            changed = get_relation_graph().apply_event(
+                kind,
+                [str(a) for a in actors],
+                weight=p.get("weight"),
+                note=str(p.get("note") or f"scenario:{self.scenario.scenario_id}"),
+            )
+            pairs = ", ".join(f"{c['pair'][0]}↔{c['pair'][1]}={c['strength']}"
+                              for c in changed)
+            return f"relation[{kind}] {pairs}"
+
         if t == "set_quest_status":
             quest_id = str(p.get("quest"))
             owner = p.get("owner")

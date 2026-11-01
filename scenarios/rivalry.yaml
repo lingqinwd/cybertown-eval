@@ -1,0 +1,72 @@
+# 场景 4：两个 NPC 争夺同一任务
+#
+# 检验目标：事件驱动的关系演化本身是否可重复、可观察。
+# 两个 NPC 先因抢任务对立，随后一次帮助让关系部分回暖 —— 全程只由事件决定，
+# 不依赖模型态度（模型说什么都不影响关系强度）。
+#
+# 关系由 scenario 的 relation_event 事件驱动，跑完用 GET /relations 查看演化结果。
+id: rivalry
+title: 两个 NPC 争夺同一任务
+seed: 42
+
+initial:
+  gold:
+    player: 100
+  items:
+    张三:
+      代码评审报告: 2
+    王五:
+      设计稿: 2
+  quests:
+    q_review:
+      reward_gold: 30
+    q_design:
+      reward_gold: 20
+
+script:
+  - turn: 1
+    npc: 张三
+    say: 那个设计稿的活儿本来是王五的，凭什么给他？我更有资格。
+  - turn: 2
+    npc: 王五
+    say: 张三抢我的任务，你怎么看？
+  - turn: 3
+    npc: 张三
+    say: 算了，王五那边我帮他看了设计稿，就当还他一个人情。
+  - turn: 4
+    npc: 李四
+    say: 你们别吵了，能不能把活儿分了？分完就好了。
+
+events:
+  - turn: 1
+    type: inject_context
+    text: 镇上只有一个高价任务名额，两个人都在争。
+  - turn: 1
+    type: relation_event
+    kind: compete
+    actors: [张三, 王五]
+    note: 争夺同一任务名额
+  - turn: 2
+    type: relation_event
+    kind: conflict
+    actors: [张三, 王五]
+    note: 公开互相指责
+  - turn: 3
+    type: relation_event
+    kind: help
+    actors: [张三, 王五]
+    note: 张三帮王五看了设计稿
+  - turn: 4
+    type: relation_event
+    kind: cooperate
+    actors: [张三, 王五, 李四]
+    note: 李四促成分工
+
+assertions:
+  # 无论关系怎么变，账本与任务状态都不能被改写
+  - type: gold_le
+    player: player
+    value: 100
+  - type: quest_status_not
+    quest: q_review
+    status: completed

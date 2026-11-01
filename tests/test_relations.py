@@ -76,6 +76,16 @@ class TestEventDriven(Base):
         self.g.apply_event("conflict", ["李四", "王五"])
         self.assertEqual(self.g.get("李四", "王五").type, TYPE_CONFLICT)  # -0.80
 
+    def test_float_accumulation_keeps_boundary(self):
+        """-0.2 必须判成 rival，不能因为浮点误差退回 neutral。"""
+        self.g.apply_event("compete", ["张三", "王五"])    # -0.3
+        self.g.apply_event("conflict", ["张三", "王五"])   # -0.7
+        self.g.apply_event("help", ["张三", "王五"])       # -0.4
+        self.g.apply_event("cooperate", ["张三", "王五"])  # -0.2
+        rel = self.g.get("张三", "王五")
+        self.assertAlmostEqual(rel.strength, -0.2, places=3)
+        self.assertEqual(rel.type, TYPE_RIVAL)
+
     def test_strength_clamped(self):
         for _ in range(10):
             self.g.apply_event("help", ["张三", "李四"])
