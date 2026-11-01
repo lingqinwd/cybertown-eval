@@ -375,7 +375,9 @@ class NPCAgentManager:
             return f"抱歉,我现在有点忙,等会儿再聊吧。(错误: {str(e)})"
     
     # ==================== 世界动作提议 ====================
-    ACTION_MARKER = re.compile(r"<<\s*ACTION\s*(\{.*?\})\s*>>", re.DOTALL | re.IGNORECASE)
+    # 小模型常把结尾写成 ">" 或 "}}}"，所以解析不依赖定界符：
+    # 定位 <<ACTION，再用 JSONDecoder.raw_decode 取第一个完整 JSON 对象。
+    ACTION_OPEN = re.compile(r"<<\s*ACTION\s*", re.IGNORECASE)
 
     def _build_action_context(self, player_id: str) -> str:
         """给模型看的世界状态与动作白名单（模型只能提议，不能改状态）。"""
@@ -420,19 +422,30 @@ class NPCAgentManager:
         return "\n".join(lines)
 
     def _handle_action_proposal(self, response: str, player_id: str):
-        """解析并裁决模型提议的动作，返回 (给玩家看的文本, 裁决结果或 None)。"""
+        """解析并裁决模型提议的动作，返回 (给玩家看的文本, 裁决结果或 None)。
+
+        解析策略：定位 ``<<ACTION`` 之后的第一个 ``{``，用 ``json.JSONDecoder.raw_decode``
+        取第一个完整对象，忽略其后的任何残渣（``>``、``>>``、多余的 ``}`` 等）。
+        理由见类属性处的注释 —— 小模型写不对定界符，但 JSON 本体通常是对的。
+        """
         if not self.action_enabled:
             return response, None
 
         text = response or ""
-        match = self.ACTION_MARKER.search(text)
+        match = self.ACTION_OPEN.search(text)
         if not match:
             return text, None
 
-        clean = self.ACTION_MARKER.sub("", text).strip()
-        raw = match.group(1)
+        # 标记之后的内容一律不给玩家看（约定是"标记放最后一行"）
+        clean = text[:match.start()].strip()
+        brace = text.find("{", match.end() - 1)
+        if brace < 0:
+            print("  ⚠️ 动作标记后缺少 JSON 对象，已从回复中剥离")
+            return clean, {"proposed": text[match.start():][:160], "accepted": False,
+                           "code": "truncated", "message": "动作标记后缺少 JSON 对象"}
+
         try:
-            payload = json.loads(raw)
+            payload, _consumed = json.JSONDecoder().raw_decode(text[brace:])
             action = str(payload.get("action", "")).strip()
             args = payload.get("args") or {}
             if not action:
@@ -440,8 +453,9 @@ class NPCAgentManager:
             if not isinstance(args, dict):
                 raise ValueError("args 必须是对象")
         except Exception as exc:  # 解析失败不影响正常对话
-            print(f"  ⚠️ 动作 JSON 解析失败: {exc} | 原文: {raw[:100]}")
-            return clean, {"proposed": raw[:120], "accepted": False,
+            snippet = text[brace:brace + 160]
+            print(f"  ⚠️ 动作 JSON 解析失败: {exc} | 原文: {snippet}")
+            return clean, {"proposed": snippet, "accepted": False,
                            "code": "parse_error", "message": str(exc)}
 
         from actions import apply_action

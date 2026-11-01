@@ -1,0 +1,22 @@
+
+=== 动作 JSON 稳定性测试 ===
+模型: qwen2.5:1.5b   后端: http://127.0.0.1:8000   NPC: 李四   轮数: 10
+口径: parse_error / truncated（未闭合）记为 JSON 失败；无提议不计入失败
+
+ #       耗时  结果               code                 回复/提议
+------------------------------------------------------------------------------------------------
+ 1     1.3s  JSON 坏           truncated            <<ACTION {"action": "accept_quest"
+ 2     1.0s  JSON 坏           truncated            <<ACTION {"action": "accept_quest"
+ 3     1.1s  JSON 坏           truncated            <<ACTION {"action": "accept_quest"
+ 4     1.1s  JSON 坏           truncated            <<ACTION {"action": "accept_quest"
+ 5     1.1s  JSON 坏           truncated            <<ACTION {"action": "accept_quest"
+ 6     1.1s  JSON 坏           truncated            <<ACTION {"action": "complete_ques
+ 7     1.1s  JSON 坏           truncated            <<ACTION {"action": "accept_quest"
+ 8     1.3s  JSON 坏           truncated            <<ACTION {"action": "transfer_item
+ 9     1.3s  JSON 坏           truncated            <<ACTION {"action": "transfer_item
+10     1.2s  JSON 坏           truncated            <<ACTION {"action": "accept_quest"
+------------------------------------------------------------------------------------------------
+提议率      : 10/10 = 100%
+JSON 合法率 : 0/10 = 0%
+平均每轮耗时: 1.2 s
+明细已写入: experiments\governance\json_stability_qwen1.5b.csv
