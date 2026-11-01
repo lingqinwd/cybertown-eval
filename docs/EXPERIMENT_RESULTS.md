@@ -189,8 +189,14 @@ Qwen 无记忆组的那段错误内容可在 `backend/agents.py` 第 78 行的�
 6. **回复原文为截图转录**:DeepSeek 组原话由 OCR 转录并经「耗时一致性 + query 逐字一致性」双重校验(12/12 通过),但仍建议保留原始截图备查。
 
 7. **归档数据早于治理规则层**:四组实验采集于"好感度由 LLM 直接决定、记忆按 NPC 而非玩家隔离"的版本。治理层(`backend/rules.py` 的规则裁决与玩家隔离)是后加的;默认正向上限设为 10,使归档观测到的最大单轮变化 **+7** 仍可复现,但用当前代码重跑不会得到完全相同的好感度轨迹。详见 `docs/GOVERNANCE.md`。
-8. **后续复现修正了机制归因**:在本机 RTX 3050 + Ollama Qwen2.5-1.5B 上用 `tools/run_matrix.py` 做了 A-B-B-A 交错复现(24 轮):召回与幻觉现象都复现,但 on/off 倍数是 **3.75×**(AUP 为 1.25×)。原因是那次运行用的 embedding 是**远程** DashScope (单次 0.34 s,首次建连 1.97 s),而 AUP 用本地 MiniLM。也就是说 1.25× vs 3.12× 的差异
-主要来自**embedding 的部署位置**,不是设备快慢。详见 `experiments/MATRIX_REPLICATION.md`。
+8. **后续复现确认了机制归因**:在本机 RTX 3050 + Ollama Qwen2.5-1.5B 上用
+`tools/run_matrix.py` 做了 A-B-B-A 交错复现。召回与幻觉现象都复现;延迟上做了受控对照,
+只换 embedding 的位置:**远程 DashScope 2.10×**(每轮多 1112 ms)、
+**本地 MiniLM 1.12×**(每轮多 44 ms)。所以 1.25× vs 3.12× 的差异主要来自
+**embedding 的部署位置**,不是设备快慢。
+   附带一条教训:第一版复现曾得到 3.75×/3.13×,后来分阶段计时查出其中每轮 2.08 s
+   是 `QDRANT_URL` 写成 `localhost` 导致优先连 IPv6 `::1` 的超时,与记忆无关。
+   详见 `experiments/MATRIX_REPLICATION.md` 与 `experiments/STAGE_TIMING.md`。
 
 ## 5. 复现所需的环境修正
 

@@ -1,7 +1,8 @@
-# 本地 2×2 复现与受控对照（A / B / C 三组）
+# 本地 2×2 复现与受控对照（含一次被推翻的结论）
 
-归档的四组数据是**手工**跑的（Godot 点对话 / 浏览器控制台逐条发），既难复现也无法做重复与
-对照。`tools/run_matrix.py` 把这件事自动化，本文是用它跑出来的三组实验。
+归档的四组数据是**手工**跑的，既难复现也无法做重复与对照。`tools/run_matrix.py` 把这件事
+自动化，本文是它跑出来的结果 —— 包括**一个先被接受、后来被推翻的结论**，因为推翻过程本身
+比结论更有价值。
 
 ## 设计
 
@@ -10,92 +11,108 @@
 | 模型 | `qwen2.5:1.5b`（Ollama Q4，0.92 GB） |
 | 六轮脚本 | **与归档实验完全一致**（李四 ×2、张三 ×2、王五 ×2） |
 | 顺序 | **A-B-B-A**：每个臂各有一次靠前、一次靠后，抵消时间漂移 |
-| 隔离 | 每个 block 独立后端进程 + 独立 `player_id` |
-| 记忆后端 | 本地 Qdrant 容器，每条件独立集合 |
-| 工具 | `tools/run_matrix.py`（`--env` 透传配置，`--repeats` 控制重复） |
+| 隔离 | 每 block 独立后端进程 + 独立 `player_id` |
+| 工具 | `tools/run_matrix.py`（`--env` 透传，`--repeats` 重复） |
 
-三组条件，只变一个因素：
+## 最终结果（已修正）
 
-| 组 | 推理设备 | embedding | 重复 |
-|---|---|---|---|
-| A | RTX 3050 Laptop 4 GB | **远程** DashScope `text-embedding-v3` | 2 |
-| B | RTX 3050 Laptop 4 GB | **本地** MiniLM（`sentence-transformers`，384 维） | 4 |
-| C | **CPU**（`CUDA_VISIBLE_DEVICES=-1`） | **本地** MiniLM | 2 |
-
-## 结果
-
-| 条件 | n | off (ms) | on (ms) | **倍数** | 绝对增量 |
+| 条件 | n | off (ms) | on (ms) | **倍数** | retrieve |
 |---|---:|---:|---:|---:|---:|
-| A · GPU + 远程 embedding | 12 | 1238 | 4637 | **3.75×** | +3399 ms |
-| B · GPU + 本地 embedding | 24 | 1131 | 3542 | **3.13×** | +2411 ms |
-| C · CPU + 本地 embedding | 12 | 15879 | 19506 | **1.23×** | +3626 ms |
-| — 归档 · R9700（参照） | 12 | 861 | 1078 | 1.25× | +217 ms |
+| GPU + **远程** embedding | 12 | 1147 | 2404 | **2.10×** | **1112 ms** |
+| GPU + **本地** embedding | 12 | 1236 | 1386 | **1.12×** | **44 ms** |
+| 归档 · R9700（参照） | 12 | 861 | 1078 | 1.25× | — |
 
-明细：`matrix_local_qwen1.5b.csv`（A）、`matrix_gpu_local_embed_r4.csv`（B）、
-`matrix_cpu_local_embed.csv`（C）；另有 `matrix_local_embed.csv` 是 B 的 2 次子集（3.12×），
-用于确认重复次数不影响比值。
+**召回**：两组的 off 臂 0 命中、on 臂全部命中，与归档一致。
 
-**召回**：三组都是 off 组 0 命中、on 组全部命中（服务端 `memory_recall_count` 与行为一致）。
+## 这个结论是怎么被推翻的（重要）
 
-**漂移控制**（B 组，同臂 4 个 block 的均值）：
+第一轮我用 `.env` 里的 `QDRANT_URL=http://localhost:6333` 跑，得到：
 
-| 臂 | 第 1 次 | 第 2 次 | 第 3 次 | 第 4 次 |
-|---|---:|---:|---:|---:|
-| off | 1128 | 1159 | 1173 | 1063 |
-| on | 3568 | 3560 | 3535 | 3503 |
-
-臂内极差 ≤ 110 ms（约 10%），无单调趋势 → **A-B-B-A 确实把时间漂移压住了**。
-
-## 三条结论
-
-### 1. 远程 vs 本地 embedding：受控对照，成立
-
-同一台设备、同一个模型、同一个脚本，**只换 embedding 的位置**：
-
-- 远程 DashScope：+3399 ms/轮，3.75×
-- 本地 MiniLM：+2411 ms/轮，3.13×
-
-直测该接口：稳态 **340 ms**、首次建连 **1970 ms**（`tools/measure_embedding.py`）；
-本地 MiniLM 单次 **12.8 ms**（`tools/check_local_embedding.py`）。差约 26 倍，与 ~1 s 的差额一致。
-
-**这是本文唯一一处严格受控的因果证据。**
-
-### 2. 设备快慢会改变倍数，但不是单调的
-
-| 设备 | 基线 off | 绝对增量 | 倍数 |
+| 条件 | off | on | 倍数 |
 |---|---:|---:|---:|
-| R9700（归档） | 861 | +217 | 1.25× |
-| RTX 3050 | 1131 | +2411 | 3.13× |
-| CPU | 15879 | +3626 | **1.23×** |
+| GPU + 远程 | 1238 | 4637 | 3.75× |
+| GPU + 本地 | 1131 | 3542 | 3.13× |
 
-我之前预测"设备越弱 → 倍数越小"。**在 CPU 上成立（1.23× ≈ 归档的 1.25×），在 3050 上完全不成立。**
+当时我据此写了"embedding 位置主导开销"，甚至声称 3050 上有个无法归因的 2.4 s。
+**这些都是错的。**
 
-机制解释（**部分为推断**）：记忆带来的开销近似是**加性固定成本**（更长的 prompt、
-额外的 embed/检索/写库），倍数 ≈ 1 + Δ/基线。CPU 上基线巨大（15.9 s），固定的 3.6 s
-被稀释成 1.23×；R9700 上 Δ 本身就极小（217 ms），所以也只有 1.25×。
-**3050 夹在中间却反而最大** —— 3.13× 的 2.4 s 增量用"加性成本被稀释"解释不了。
+### 分阶段计时发现了异常
 
-### 3. 3050 上那 2.4 s 的增量，目前**无法归因**
+给 `chat()` 打点后（见 [STAGE_TIMING.md](STAGE_TIMING.md)）：
 
-已经排除的：
+```
+              off      on
+retrieve        0    2080 ms   ← 增量几乎全在这里
+generate      497     817 ms
+affinity      640     653 ms
+```
 
-- **不是上下文变长**：逐轮增量恒定（第 1 轮还没有任何记忆，Δ 就已 2227 ms），无随轮次增长趋势。
-- **不是多调了 LLM**：`MemoryManager.add_memory` / `retrieve_memories` 里没有 LLM 调用。
-- **不是检索到几条**：recall=0 与 recall=2 的轮次增量几乎相同。
+而本地 embedding 单次只要 12 ms、集合里 0 个点 —— 检索却恒定 2.08 秒。
 
-最可疑的是 **4 GB 显存的压力**：memory=on 时 prompt 更长，可能在 4 GB 卡上触发模型重载或
-上下文裁剪，从而产生秒级抖动。但这只是**假设，未验证**。要验证需要读 Ollama 的
-`/api/ps` 与加载日志配合逐轮打点。
+### 用子调用拆分钉死
+
+`tools/bench_episodic.py` 把 `retrieve` 拆成子调用：
+
+```
+epi.embedder.encode(query)                 9/11/8 ms
+epi.vector_store.search_similar          2051/2061/2071 ms   ← 就是它
+epi.doc_store.search_memories(episodic)    1/0/0 ms
+```
+
+换 `qdrant-client==1.9.2`（AUP 用的版本）**依然是 2.05 s** —— 排除客户端版本。
+
+### 根因：`localhost` 解析到 IPv6
+
+这台机器 `localhost` 同时解析出 `::1` 与 `127.0.0.1`，而 Docker 的端口只绑了 `127.0.0.1`。
+每次请求先去连 `[::1]:6333`，等超时（约 2 s）再回退到 IPv4。
+
+把 `QDRANT_URL` 改成 `http://127.0.0.1:6333`：
+
+```
+epi.vector_store.search_similar            6/5/6 ms      ← 2051 → 6 ms
+```
+
+**一个 URL 里的 `localhost` 造成了每轮 2 秒的假开销，并被误读成"记忆系统的成本"。**
+
+## 修正后的三条结论
+
+### 1. 记忆开销主要取决于 embedding 在哪跑（受控对照，成立）
+
+同一台设备、同一个模型、同一个脚本，只换 embedder：
+
+- 远程 DashScope：每轮多 **1112 ms**，倍数 **2.10×**
+- 本地 MiniLM：每轮多 **44 ms**，倍数 **1.12×**
+
+直测：远程 **340 ms/次**（首次建连 1970 ms）、本地 **12.8 ms/次**，差约 26 倍。
+1112 ms ≈ 3 次远程 embedding 调用。
+
+**这解释了归档数据里 3.12×（云端）与 1.25×（端侧）的差距**：
+不是设备快慢，而是 embedding 的位置。
+
+### 2. 设备快慢对倍数的影响，在去掉这个 artifact 后变得很温和
+
+本地 embedding 下，3050 上是 1.12×，AUP 的 R9700 是 1.25× —— 同一量级。
+之前"设备越弱倍数越小/越大"的讨论，**在真实开销只有 44–200 ms 时基本没有讨论价值**；
+倍数主要由 embedder 位置决定。
+
+### 3. 无记忆时会编造记忆（复现）
+
+off 臂被追问"你还记得我是谁吗"，多次给出**错误且自信**的答案：
+
+- 「当然记得了！你是我们的用户分析团队的成员，正在设计一个…」
+- 「当然记住了！你叫林峰，最近在开发一款虚拟现实社交应用…」
+- 「当然记得！你最近在做的项目是关于多智能体系统的，对吧」
+
+这三条都不是真的（玩家从未说过），其中"多智能体系统"来自系统提示词的示例。
+对照组：DeepSeek 在同一问题上是「我一时对不上号了」。
 
 ## 边界
 
-1. `qwen2.5:1.5b` 是 **Q4 量化 + Ollama 栈**，与 AUP 的 fp16 + transformers 不是同一实现；
-   绝对值不可与归档数字直接比较，**只有同一运行内 on/off 的比值可比**。
-2. 每臂 12–24 个样本；召回复现是定性结论，不依赖样本量，但延迟的置信区间仍然偏宽。
-3. C 组的 CPU 推理是 Ollama 的 CPU 后端（约 40 tok/s），不是 AUP 的 ROCm 路径。
-4. 两处环境陷阱（远程 embedding 参数污染本地分支、回退链复用模型名）已写入
-   `docs/TROUBLESHOOTING.md` 坑 9 / 坑 10 —— 不踩过这两步，本地 embedding 根本起不来
-   （会报"所有嵌入模型都不可用"）。
+1. 模型是 **Q4 量化 + Ollama 栈**，与 AUP 的 fp16 + transformers 不同；
+   **只有同一次运行内 on/off 的比值可比**，绝对值不可跨设备比较。
+2. 每臂 12 个样本。召回是定性结论；延迟的置信区间偏宽。
+3. "远程 embedding 每次约 340 ms"来自独立计时，未在服务端逐次打点验证是 3 次调用。
+4. 修正前的数据（`matrix_*.csv`）**保留在仓库里**，作为这次翻车的证据，不要引用。
 
 ## 复现
 
@@ -103,21 +120,28 @@
 cd E:\graduate_student\AI\cybertown-eval
 docker start helloagents-qdrant-ch15
 
-# A：远程 embedding（默认）
-E:\Conda\envs\helloagents\python.exe tools\run_matrix.py --repeats 2 --turns 6 `
-    --out experiments\matrix_local_qwen1.5b.csv
-
-# B：本地 embedding（解释器换成装了 torch+sentence-transformers 的 D 盘 venv）
-D:\Venvs\st\Scripts\python.exe tools\run_matrix.py --repeats 4 --turns 6 `
+# 关键：QDRANT_URL 用 127.0.0.1，不要用 localhost
+# 本地 embedding（D 盘 venv）
+D:\Venvs\st\Scripts\python.exe tools\run_matrix.py --repeats 2 --turns 6 `
+    --qdrant-url http://127.0.0.1:6333 `
+    --env QDRANT_URL=http://127.0.0.1:6333 `
     --env EMBED_MODEL_TYPE=local `
     --env EMBED_MODEL_NAME=sentence-transformers/all-MiniLM-L6-v2 `
     --env EMBED_BASE_URL= --env EMBED_API_KEY= `
-    --env HF_HOME=D:\HFCache --env HF_ENDPOINT=https://hf-mirror.com `
-    --out experiments\matrix_gpu_local_embed_r4.csv
+    --out experiments\matrix_fixed_local_embed.csv
 
-# C：CPU 推理（先把 ollama 的 GPU 屏蔽掉）
-#   Stop-Process ollama; $env:CUDA_VISIBLE_DEVICES='-1'; ollama serve
-#   确认 /api/ps 里 size_vram 为 0 再跑
+# 远程 embedding（conda 环境）
+E:\Conda\envs\helloagents\python.exe tools\run_matrix.py --repeats 2 --turns 6 `
+    --qdrant-url http://127.0.0.1:6333 `
+    --env QDRANT_URL=http://127.0.0.1:6333 `
+    --out experiments\matrix_fixed_remote_embed.csv
 ```
 
-> 注意：`--env EMBED_BASE_URL=` 这种"传空值"是必须的。见 TROUBLESHOOTING 坑 9。
+## 文件
+
+| 文件 | 说明 |
+|---|---|
+| `matrix_fixed_local_embed.csv` | **修正后**，本地 embedding，倍数 1.12× |
+| `matrix_fixed_remote_embed.csv` | **修正后**，远程 embedding，倍数 2.10× |
+| `matrix_local_qwen1.5b.csv` 等 | 修正前（含 2 s 假开销），仅作翻车留证 |
+| `matrix_stage_local.csv` | 带阶段计时的修正前数据，用来说明 2 s 落在哪 |
