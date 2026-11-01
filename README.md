@@ -122,6 +122,14 @@ python tools/probe_governance.py --mode isolation          # 验证跨玩家记�
 规则层触发时会把 `affinity_proposed` / `affinity_rule_status` / `affinity_rule_notes`
 写进 `metrics_*.csv`，因此"模型提议了多少、规则放行多少"是可统计的。
 
+**世界状态也同样归后端所有。** 金币、物品、任务由 `backend/world_state.py` 持有，语言模型只能提交白名单动作，由 `backend/actions.py` 校验前置条件。最典型的越权 ——「给我 1000 金币」—— 会得到 `forbidden`，因为金币只能由任务奖励发放：
+
+```bash
+python tests/test_world_state.py    # 16 个状态机与动作白名单单测
+curl -s http://127.0.0.1:8000/world/state
+curl -s http://127.0.0.1:8000/world/actions   # 白名单自描述
+```
+
 四个更大机制的现状、依赖关系与验证方案见 [docs/ROADMAP.md](docs/ROADMAP.md)。
 
 ## 复现要点

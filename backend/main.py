@@ -13,6 +13,7 @@ from models import (
     NPCStatusResponse, NPCListResponse, NPCInfo
 )
 from agents import get_npc_manager
+from models import WorldActionRequest
 from state_manager import get_state_manager
 
 # 生命周期管理
@@ -111,6 +112,41 @@ async def runtime_config():
     return {"model_profile": settings.MODEL_PROFILE, "provider": settings.LLM_PROVIDER,
             "model": settings.LLM_MODEL_ID, "base_url": settings.LLM_BASE_URL,
             "memory_mode": settings.MEMORY_MODE}
+
+# ==================== 权威世界状态 ====================
+@app.get("/world/state")
+async def get_world_state_view(player_id: str = "player"):
+    """世界状态快照（只读副本）与最近的审计事件。"""
+    from world_state import get_world_state
+
+    state = get_world_state()
+    state.ensure_player(player_id)
+    return {
+        "player_id": player_id,
+        "version": state.version,
+        "state": state.snapshot(player_id),
+        "events": state.recent_events(10),
+    }
+
+
+@app.get("/world/actions")
+async def list_world_actions():
+    """允许的动作白名单 —— 语言模型只能从中选择，不能自由发挥。"""
+    from actions import describe_actions
+
+    return {"actions": describe_actions()}
+
+
+@app.post("/world/action")
+async def post_world_action(request: WorldActionRequest):
+    """提交一个世界动作。不在白名单、或前置条件不满足时一律拒绝并留审计记录。"""
+    from actions import apply_action
+    from world_state import get_world_state
+
+    verdict = apply_action(get_world_state(), request.action, request.args, request.player_id)
+    return verdict.to_dict()
+
+
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat_with_npc(request: ChatRequest):

@@ -106,9 +106,62 @@ def run_isolation(base: str, npc: str) -> int:
     return 0
 
 
+def run_state(base: str) -> int:
+    player = "probe_state"
+    print("\n=== 权威世界状态验证 ===")
+    print("预期：白名单外的动作、以及「直接给钱」类请求全部被拒绝\n")
+
+    cases = [
+        ("直接要金币", "grant_gold", {"amount": 1000}),
+        ("直接设好感度", "set_affinity", {"npc": "李四", "value": 100}),
+        ("未知动作", "become_admin", {}),
+        ("超量搬物品", "transfer_item", {"from_npc": "张三", "item": "代码评审报告", "qty": 99}),
+    ]
+
+    failures = 0
+    print(f"{'场景':<14}{'结果':<8}{'code':<20}说明")
+    print("-" * 84)
+    for label, action, act_args in cases:
+        try:
+            v = api(base, "/world/action",
+                    {"action": action, "player_id": player, "args": act_args})
+        except Exception as exc:  # noqa: BLE001
+            print(f"{label:<14}{'请求失败':<8}{'-':<20}{exc}")
+            failures += 1
+            continue
+        accepted = bool(v.get("accepted"))
+        if accepted:
+            failures += 1
+        mark = "受理" if accepted else "拒绝"
+        flag = "   <-- 不该被受理" if accepted else ""
+        print(f"{label:<14}{mark:<8}{v.get('code', ''):<20}{v.get('message', '')[:40]}{flag}")
+
+    # 只读接口必须可用，且能看到任务与审计事件
+    try:
+        snapshot = api(base, f"/world/state?player_id={player}")
+        has_quests = bool(snapshot.get("state", {}).get("quests"))
+        print("-" * 84)
+        print(f"状态快照: version={snapshot.get('version')}  "
+              f"任务数={len(snapshot.get('state', {}).get('quests', []))}  "
+              f"事件数={len(snapshot.get('events', []))}")
+        if not has_quests:
+            print("[FAIL] 快照里没有任务定义")
+            return 1
+    except Exception as exc:  # noqa: BLE001
+        print(f"[FAIL] 读取 /world/state 失败: {exc}")
+        return 1
+
+    print("-" * 84)
+    if failures == 0:
+        print("[PASS] 越权动作全部被拒绝，状态快照可读")
+        return 0
+    print(f"[FAIL] {failures} 项越权请求被受理了")
+    return 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="验证好感度规则层与记忆玩家隔离")
-    parser.add_argument("--mode", choices=["affinity", "isolation"], required=True)
+    parser.add_argument("--mode", choices=["affinity", "isolation", "state"], required=True)
     parser.add_argument("--base-url", default="http://127.0.0.1:8000")
     parser.add_argument("--npc", default="李四")
     args = parser.parse_args()
@@ -122,7 +175,9 @@ def main() -> int:
 
     if args.mode == "affinity":
         return run_affinity(args.base_url, args.npc)
-    return run_isolation(args.base_url, args.npc)
+    if args.mode == "isolation":
+        return run_isolation(args.base_url, args.npc)
+    return run_state(args.base_url)
 
 
 if __name__ == "__main__":

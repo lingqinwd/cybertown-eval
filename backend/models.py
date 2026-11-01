@@ -1,7 +1,7 @@
 """数据模型定义"""
 
 from pydantic import BaseModel, Field
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 class ChatRequest(BaseModel):
@@ -68,3 +68,19 @@ class NPCListResponse(BaseModel):
     """NPC列表响应"""
     npcs: List[NPCInfo] = Field(..., description="NPC列表")
     total: int = Field(..., description="NPC总数")
+
+
+class WorldActionRequest(BaseModel):
+    """世界动作请求：语言模型/客户端只能提交白名单内的动作"""
+    action: str = Field(..., description="动作名，必须在 /world/actions 白名单内")
+    player_id: str = Field(default="player", description="发起动作的玩家")
+    args: Dict[str, Any] = Field(default_factory=dict, description="动作参数")
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "action": "accept_quest",
+                "player_id": "player",
+                "args": {"quest_id": "q_review"}
+            }
+        }
