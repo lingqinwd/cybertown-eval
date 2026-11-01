@@ -131,6 +131,8 @@ class NPCAgentManager:
         self.memories: Dict[str, MemoryManager] = {}
         self.memory_enabled = settings.MEMORY_MODE in ("on", "true", "1", "enabled")
         self.action_enabled = settings.ACTION_PROPOSAL in ("on", "true", "1", "enabled")
+        self.ledger_enabled = settings.MEMORY_LEDGER in ("on", "true", "1", "enabled")
+        self.ledgers: Dict[str, object] = {}
         self.last_metrics: Dict[str, object] = {}
         self.relationship_manager: Optional[RelationshipManager] = None  # ⭐ 好感度管理器
 
@@ -174,6 +176,22 @@ class NPCAgentManager:
                 print(f"❌ {name} Agent创建失败: {e}")
                 self.agents[name] = None
                 self.memories[memory_key(name, DEFAULT_PLAYER_ID)] = None
+
+    def _get_ledger(self, npc_name: str, player_id: str = DEFAULT_PLAYER_ID):
+        """按 (NPC, 玩家) 取可追溯记忆账本；开关关闭时返回 None。"""
+        if not self.ledger_enabled:
+            return None
+        key = memory_key(npc_name, player_id)
+        ledger = self.ledgers.get(key)
+        if ledger is None:
+            from memory_ledger import ledger_for
+            try:
+                ledger = ledger_for(npc_name, player_id)
+            except Exception as exc:  # 账本坏了不能拖垮对话
+                print(f"❌ {npc_name}/{player_id} 账本初始化失败: {exc}")
+                return None
+            self.ledgers[key] = ledger
+        return ledger
 
     def _get_agent(self, npc_name: str, player_id: str = DEFAULT_PLAYER_ID):
         """按 (NPC, 玩家) 取 Agent 实例。
@@ -303,6 +321,15 @@ class NPCAgentManager:
             stage_times["t_retrieve_ms"] = round((time.perf_counter() - t_stage) * 1000, 1)
             t_stage = time.perf_counter()
 
+            # ⭐ 2.5 可追溯记忆账本：按可信度过滤后注入（默认关闭）
+            ledger = self._get_ledger(npc_name, player_id)
+            ledger_context = ""
+            if ledger is not None:
+                ledger_context = ledger.render_context(
+                    limit=5, min_credibility=settings.MEMORY_MIN_CREDIBILITY
+                )
+
+
             # ⭐ 3. 构建增强的提示词 (包含好感度和记忆上下文)
             memory_context = self._build_memory_context(relevant_memories)
 
@@ -310,6 +337,10 @@ class NPCAgentManager:
             if memory_context:
                 enhanced_message += f"{memory_context}\n\n"
             enhanced_message += f"【当前对话】\n玩家: {message}"
+
+            # ⭐ 3.1 可追溯记忆（按可信度过滤后的）
+            if ledger_context:
+                enhanced_message += ledger_context + "\n"
 
             # ⭐ 3.2 场景引擎注入的环境描述（只有实验时才有）
             if extra_context:
@@ -364,6 +395,14 @@ class NPCAgentManager:
                     affinity_info=affinity_result
                 )
                 log_memory_saved(npc_name)
+
+            # ⭐ 6.5 同步写入可追溯账本（来源 + 先验可信度）
+            if ledger is not None:
+                try:
+                    ledger.add(message, source="dialogue.player", importance=0.5)
+                    ledger.add(response or "", source="dialogue.npc", importance=0.6)
+                except Exception as exc:
+                    print(f"⚠️ 账本写入失败: {exc}")
             stage_times["t_save_ms"] = round((time.perf_counter() - t_stage) * 1000, 1)
 
             self.last_metrics = {
@@ -381,6 +420,8 @@ class NPCAgentManager:
                 "t_action_ms": stage_times.get("t_action_ms", ""),
                 "t_affinity_ms": stage_times.get("t_affinity_ms", ""),
                 "t_save_ms": stage_times.get("t_save_ms", ""),
+                "ledger_active": len(ledger.active()) if ledger is not None else "",
+                "ledger_context_chars": len(ledger_context),
                 "affinity_before": affinity_result.get("old_affinity", affinity_result.get("affinity", 50.0)),
                 "affinity_after": affinity_result.get("new_affinity", affinity_result.get("affinity", 50.0)),
                 "affinity_proposed": affinity_result.get("proposed_change", ""),

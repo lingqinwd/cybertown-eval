@@ -11,6 +11,7 @@
 | `probe_json_stability.py` | **小模型能否稳定产出动作 JSON**：统计提议率与 JSON 合法率 | `python tools/probe_json_stability.py --n 10` |
 | `measure_embedding.py` | 测**远程** embedding 接口的单次耗时（不打印密钥） | `python tools/measure_embedding.py` |
 | `run_scenario.py` | **跑可重复实验场景**：装载场景 → 按脚本逐轮对话 → 读判据 | `python tools/run_scenario.py --scenario coercion` |
+| `probe_memory_ledger.py` | **验证可追溯记忆**：来源先验、按可信度过滤、纠正/遗忘/软删除（11 项对照检查） | `python tools/probe_memory_ledger.py` |
 
 ## 二、定位问题（拆开销）
 

@@ -1,0 +1,22 @@
+
+=== 可追溯记忆账本验证 ===
+后端 http://127.0.0.1:8000  模型 qwen2.5:1.5b  MEMORY_LEDGER=未暴露
+
+  [PASS] 注入来源的先验可信度 = 0.20  实际 0.2
+  [PASS] 玩家自述的先验可信度 = 0.60  实际 0.6
+  [PASS] 默认阈值下包含可信记忆
+  [PASS] 默认阈值下排除不可信记忆  上下文 76 字符
+  [PASS] 阈值降到 0.1 后不可信记忆出现
+  [PASS] 一轮对话后账本新增 2 条  2 → 4
+  [PASS] 原记录被标记为 corrected
+  [PASS] 纠正后可信度不低于 0.60  实际 0.6
+  [PASS] 新记录带 corrected_from
+  [PASS] 遗忘是软删除
+  [PASS] 遗忘后仍能查到（审计链保留）
+
+  统计: 共 5 条，活跃 3 条，平均可信度 0.567
+  按状态: {'corrected': 1, 'active': 3, 'forgotten': 1}
+  按来源: {'injected': 2, 'dialogue.player': 2, 'dialogue.npc': 1}
+  [PASS] 至少有一条 on-fly 对话记忆进入账本  dialogue.player=2
+
+[PASS] 8 项检查全部通过

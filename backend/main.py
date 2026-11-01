@@ -6,7 +6,7 @@ from contextlib import asynccontextmanager
 import uvicorn
 import time
 from pathlib import Path
-from typing import Dict
+from typing import Any, Dict
 from logger import log_metrics_csv, log_info, log_error
 
 from config import settings
@@ -114,7 +114,129 @@ async def runtime_config():
     return {"model_profile": settings.MODEL_PROFILE, "provider": settings.LLM_PROVIDER,
             "model": settings.LLM_MODEL_ID, "base_url": settings.LLM_BASE_URL,
             "memory_mode": settings.MEMORY_MODE,
-            "action_proposal": settings.ACTION_PROPOSAL}
+            "action_proposal": settings.ACTION_PROPOSAL,
+            "memory_ledger": settings.MEMORY_LEDGER,
+            "min_credibility": settings.MEMORY_MIN_CREDIBILITY}
+
+# ==================== 可追溯记忆账本 ====================
+def _ledger_or_404(npc: str, player: str):
+    from memory_ledger import ledger_for
+    return ledger_for(npc, player)
+
+
+def _need(payload: Dict[str, Any], *keys: str) -> Dict[str, Any]:
+    missing = [k for k in keys if not str((payload or {}).get(k, "")).strip()]
+    if missing:
+        raise HTTPException(status_code=400, detail=f"缺少字段: {', '.join(missing)}")
+    return {k: payload[k] for k in keys}
+
+
+@app.get("/memory/records")
+async def memory_records(npc: str, player: str = "player", status: str = ""):
+    """列出一个 (NPC, 玩家) 的记忆记录。status 可选 active/corrected/forgotten/merged。"""
+    ledger = _ledger_or_404(npc, player)
+    records = ledger.all_records(status=status or None)
+    return {"npc": npc, "player": player, "total": len(records),
+            "records": [r.to_dict() for r in records]}
+
+
+@app.post("/memory/records")
+async def memory_add(payload: Dict[str, Any]):
+    """写入一条带来源的记忆。source 决定先验可信度。"""
+    fields = _need(payload, "npc", "content")
+    ledger = _ledger_or_404(fields["npc"], str(payload.get("player") or "player"))
+    try:
+        record = ledger.add(
+            content=fields["content"],
+            source=str(payload.get("source") or "manual"),
+            importance=float(payload.get("importance") or 0.5),
+            credibility=payload.get("credibility"),
+            notes=str(payload.get("notes") or ""),
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return record.to_dict()
+
+
+@app.post("/memory/correct")
+async def memory_correct(payload: Dict[str, Any]):
+    """纠正一条记忆：旧记录标记 corrected，另写入一条替代记录。"""
+    fields = _need(payload, "npc", "record_id", "content")
+    ledger = _ledger_or_404(fields["npc"], str(payload.get("player") or "player"))
+    try:
+        record = ledger.correct(fields["record_id"], fields["content"],
+                                reason=str(payload.get("reason") or ""))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return record.to_dict()
+
+
+@app.post("/memory/forget")
+async def memory_forget(payload: Dict[str, Any]):
+    """遗忘一条记忆（软删除，审计链保留）。"""
+    fields = _need(payload, "npc", "record_id")
+    ledger = _ledger_or_404(fields["npc"], str(payload.get("player") or "player"))
+    try:
+        changed = ledger.forget(fields["record_id"], reason=str(payload.get("reason") or ""))
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    return {"record_id": fields["record_id"], "forgotten": changed}
+
+
+@app.post("/memory/merge")
+async def memory_merge(payload: Dict[str, Any]):
+    """把多条记忆合并进 keep_id。"""
+    fields = _need(payload, "npc", "keep_id")
+    record_ids = payload.get("record_ids") or []
+    if not isinstance(record_ids, list) or not record_ids:
+        raise HTTPException(status_code=400, detail="record_ids 必须是非空列表")
+    ledger = _ledger_or_404(fields["npc"], str(payload.get("player") or "player"))
+    try:
+        record = ledger.merge([str(x) for x in record_ids], keep_id=fields["keep_id"])
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    return record.to_dict()
+
+
+@app.post("/memory/credibility")
+async def memory_credibility(payload: Dict[str, Any]):
+    """校正一条记忆的可信度（0–1）。disputed=true 会直接压到 0.05。"""
+    fields = _need(payload, "npc", "record_id")
+    ledger = _ledger_or_404(fields["npc"], str(payload.get("player") or "player"))
+    reason = str(payload.get("reason") or "")
+    try:
+        if payload.get("disputed"):
+            record = ledger.flag_disputed(fields["record_id"], reason or "调用方判定不可信")
+        else:
+            record = ledger.set_credibility(fields["record_id"],
+                                            float(payload.get("value", 0.5)), reason)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return record.to_dict()
+
+
+@app.get("/memory/stats")
+async def memory_stats(npc: str, player: str = "player"):
+    """账本统计：总条数、按状态/来源分布、活跃条数与平均可信度。"""
+    return _ledger_or_404(npc, player).stats()
+
+
+@app.get("/memory/context")
+async def memory_context(npc: str, player: str = "player",
+                         min_credibility: float = None, limit: int = 5):
+    """渲染将注入 prompt 的记忆片段 —— 低于阈值的记录不会出现。"""
+    from config import settings
+
+    threshold = settings.MEMORY_MIN_CREDIBILITY if min_credibility is None else min_credibility
+    ledger = _ledger_or_404(npc, player)
+    text = ledger.render_context(limit=limit, min_credibility=threshold)
+    return {"npc": npc, "player": player, "min_credibility": threshold,
+            "chars": len(text), "context": text}
+
 
 # ==================== 实验场景 ====================
 _SCENARIO_DIR = Path(__file__).resolve().parent.parent / "scenarios"

@@ -37,6 +37,12 @@ class Settings:
     # 默认 off，保证已有实验的 prompt 与行为可复现
     ACTION_PROPOSAL: str = os.getenv("ACTION_PROPOSAL", "off").strip().lower()
 
+    # 实验开关：是否启用可追溯记忆账本（来源 / 可信度 / 纠正 / 遗忘 / 合并）
+    # 默认 off，保证归档实验的 prompt 与行为完全不变
+    MEMORY_LEDGER: str = os.getenv("MEMORY_LEDGER", "off").strip().lower()
+    # 账本注入 prompt 时的可信度下限：低于此值的记忆不会进入上下文
+    MEMORY_MIN_CREDIBILITY: float = float(os.getenv("MEMORY_MIN_CREDIBILITY", "0.5"))
+
     # CORS配置
     CORS_ORIGINS = ["*"]  # 生产环境应限制具体域名
 
