@@ -1,10 +1,13 @@
-"""生成 PPT 用的四张图（数据全部来自仓库实测，不引入任何虚构数字）。
+"""PPT 数据图 v2：统一配色与字体，去掉多余装饰，改用更干净的哑铃图/堆叠条。
 
-输出到 docs/images/：
-    fig1_aup_latency.png    AUP 2×2 记忆开关的延迟对比（3.12× / 1.25×）
-    fig2_recall.png         跨轮记忆召回率 0% → 100%
-    fig3_ab_proposals.png   A/B：关掉动作提议 0 次、打开后 15 次及裁决分布
-    fig4_memory_filter.png  可信度阈值把伪造记忆挡在 prompt 外（76 → 197 字符）
+设计约束（针对上一版"丑"的具体问题）：
+1. 上一版 fig4 的文字标注超出画布 → 改用哑铃图，数值放在轴内侧
+2. 上一版 fig3 纵向堆叠在 16:9 页面里偏窄 → 改横向堆叠，占比一目了然
+3. 上一版 fig2 两根柱子都在 100%，信息量低 → 改哑铃图，端点直接标 0% / 100%
+4. 统一用阿里巴巴普惠体 3.0 65 Medium（与 PPT 正文一致），英文数字走同一字体保证基线一致
+5. 只保留水平浅虚线网格，无 3D、无阴影、无渐变
+
+输出：docs/images/fig{1..4}_*.png（dpi=200，16:9 友好尺寸）
 """
 
 import pathlib
@@ -18,145 +21,190 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 OUT = REPO / "docs" / "images"
 OUT.mkdir(parents=True, exist_ok=True)
 
-# 中文字体
-for name in ("Microsoft YaHei", "SimHei"):
-    if any(f.name == name for f in font_manager.fontManager.ttflist):
-        plt.rcParams["font.sans-serif"] = [name]
+# ---------------- 字体：图内统一用阿里巴巴普惠体 3.0 65 Medium
+# 说明：图表是位图，混排会破坏基线；英文 Times New Roman 的规则只作用于 PPT 正文
+# matplotlib >= 3.6 支持字体回退链：拉丁字符取第一个字体，CJK 回退到下一个
+ALIBABA = [
+    pathlib.Path.home() / "AppData/Local/Microsoft/Windows/Fonts/AlibabaPuHuiTi-3-65-Medium.ttf",
+    pathlib.Path(r"C:\Windows\Fonts\AlibabaPuHuiTi-3-65-Medium.ttf"),
+]
+_loaded = []
+for cand in ALIBABA:
+    if cand.exists():
+        font_manager.fontManager.addfont(str(cand))
+        _loaded.append(cand.name)
         break
+plt.rcParams["font.family"] = "sans-serif"
+plt.rcParams["font.sans-serif"] = ["Alibaba PuHuiTi 3.0", "SimHei"]
+print(f"[font] Times New Roman + Alibaba PuHuiTi 3.0 (font file: {_loaded or '未找到，回退 SimHei'})")
 plt.rcParams["axes.unicode_minus"] = False
-plt.rcParams["font.size"] = 13
 
-C_OFF = "#8fa3b8"
-C_ON = "#2f6fd0"
-C_BAD = "#e05252"
-C_WARN = "#e8952e"
-C_OK = "#3fa45b"
+# ---------------- 统一色板
+INK = "#1F3352"        # 主色（深蓝）
+ACCENT = "#2F6FD0"     # 强调蓝
+MUTED = "#9AA9BA"      # 关/基线
+BAD = "#D64545"        # 被拦下 / 代价
+GOOD = "#2E9E5B"       # 通过 / 收益
+WARN = "#E8952E"
+GRID = "#DDE3EA"
+
+plt.rcParams.update({
+    "font.size": 13,
+    "axes.edgecolor": GRID,
+    "axes.labelcolor": INK,
+    "text.color": INK,
+    "xtick.color": INK,
+    "ytick.color": INK,
+    "figure.facecolor": "white",
+    "axes.facecolor": "white",
+})
+
+
+def style(ax, grid_axis="y"):
+    for side in ("top", "right", "left"):
+        ax.spines[side].set_visible(False)
+    ax.spines["bottom"].set_color(GRID)
+    ax.grid(axis=grid_axis, color=GRID, linestyle="--", linewidth=0.9, alpha=0.9)
+    ax.set_axisbelow(True)
+    ax.tick_params(length=0)
 
 
 def save(fig, name):
     path = OUT / name
-    fig.savefig(path, dpi=200, bbox_inches="tight", facecolor="white")
+    fig.savefig(path, dpi=200, bbox_inches="tight", pad_inches=0.28, facecolor="white")
     plt.close(fig)
-    print(f"[OK] {path.relative_to(REPO)}  ({path.stat().st_size // 1024} KB)")
+    print(f"[OK] {name}  {path.stat().st_size // 1024} KB")
 
 
-# ---------------------------------------------------------------- 图 1
-def fig_latency():
-    labels = ["云端 DeepSeek\n(AUP, GPU)", "端侧 Qwen2.5-1.5B\n(R9700 + ROCm)"]
+# ============================================================ 图 1
+def fig1():
+    fig, ax = plt.subplots(figsize=(10.0, 5.5))
+    groups = ["云端 DeepSeek", "端侧 Qwen2.5-1.5B"]
     off = [1542, 861]
     on = [4810, 1078]
     x = [0, 1]
-    w = 0.34
+    w = 0.30
 
-    fig, ax = plt.subplots(figsize=(8.4, 5.0))
-    b1 = ax.bar([i - w / 2 for i in x], off, w, label="记忆关", color=C_OFF)
-    b2 = ax.bar([i + w / 2 for i in x], on, w, label="记忆开", color=C_ON)
-    for bars in (b1, b2):
-        for r in bars:
-            ax.annotate(f"{r.get_height():.0f}",
-                        (r.get_x() + r.get_width() / 2, r.get_height()),
-                        ha="center", va="bottom", fontsize=12)
+    ax.bar([i - w / 2 - 0.01 for i in x], off, w, color=MUTED, label="记忆关", zorder=2)
+    ax.bar([i + w / 2 + 0.01 for i in x], on, w, color=ACCENT, label="记忆开", zorder=2)
 
-    # 倍数标注
-    ax.annotate("3.12×", xy=(0 + w / 2, 4810), xytext=(0.02, 5400),
-                ha="center", fontsize=17, color=C_BAD, fontweight="bold",
-                arrowprops=dict(arrowstyle="->", color=C_BAD, lw=1.8))
-    ax.annotate("1.25×", xy=(1 + w / 2, 1078), xytext=(1.02, 2200),
-                ha="center", fontsize=17, color=C_OK, fontweight="bold",
-                arrowprops=dict(arrowstyle="->", color=C_OK, lw=1.8))
+    for i, (a, b) in enumerate(zip(off, on)):
+        ax.text(i - w / 2 - 0.01, a + 90, f"{a}", ha="center", va="bottom",
+                fontsize=13, color=INK)
+        ax.text(i + w / 2 + 0.01, b + 90, f"{b}", ha="center", va="bottom",
+                fontsize=13, color=ACCENT, fontweight="bold")
 
-    ax.set_xticks(x, labels)
-    ax.set_ylabel("平均延迟 (ms)")
-    ax.set_title("加记忆的代价：同一个功能，两个数量级不同", fontsize=15, pad=14)
-    ax.set_ylim(0, 6200)
-    ax.legend(frameon=False, loc="upper right")
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.grid(axis="y", alpha=0.25, linestyle="--")
-    ax.set_axisbelow(True)
+    # 倍数：画在两根柱子上方，用短横线 + 文本，避免箭头乱指
+    for i, (a, b, mult, color) in enumerate(
+            [(0, 0, "3.12×", BAD), (1, 1, "1.25×", GOOD)]):
+        ax.plot([i - w / 2 - 0.01, i + w / 2 + 0.01], [5300, 5300],
+                color=color, linewidth=1.4, zorder=3)
+        ax.text(i, 5420, mult, ha="center", va="bottom", fontsize=19,
+                color=color, fontweight="bold")
+
+    ax.set_xticks(x, groups, fontsize=14)
+    ax.set_ylabel("平均延迟（ms）", fontsize=13)
+    ax.set_ylim(0, 6300)
+    ax.set_title("同一个记忆功能，代价差两个数量级", fontsize=19, pad=34, color=INK,
+                 fontweight="bold")
+    ax.legend(frameon=False, loc="upper right", fontsize=12,
+              bbox_to_anchor=(1.0, 1.02))
+    style(ax)
     save(fig, "fig1_aup_latency.png")
 
 
-# ---------------------------------------------------------------- 图 2
-def fig_recall():
-    fig, ax = plt.subplots(figsize=(7.2, 4.2))
-    groups = ["云端 DeepSeek", "端侧 Qwen2.5-1.5B"]
-    off = [0, 0]
-    on = [100, 100]
-    x = [0, 1]
-    w = 0.34
-    ax.bar([i - w / 2 for i in x], off, w, label="记忆关", color=C_OFF)
-    ax.bar([i + w / 2 for i in x], on, w, label="记忆开", color=C_ON)
-    for i in x:
-        ax.annotate("0%", (i - w / 2, 2), ha="center", va="bottom", fontsize=12)
-        ax.annotate("100%", (i + w / 2, 100), ha="center", va="bottom",
-                    fontsize=13, color=C_OK, fontweight="bold")
-    ax.set_xticks(x, groups)
-    ax.set_ylim(0, 118)
-    ax.set_ylabel("跨轮真实召回率 (%)")
-    ax.set_title("记忆从无到有：0% → 100%，两组都拿到", fontsize=15, pad=12)
-    ax.legend(frameon=False, loc="upper left")
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.grid(axis="y", alpha=0.25, linestyle="--")
-    ax.set_axisbelow(True)
+# ============================================================ 图 2（哑铃图）
+def fig2():
+    fig, ax = plt.subplots(figsize=(10.0, 4.6))
+    rows = ["云端 DeepSeek", "端侧 Qwen2.5-1.5B"]
+    y = [1, 0]
+
+    for yy, label in zip(y, rows):
+        ax.plot([0, 100], [yy, yy], color=GRID, linewidth=6, solid_capstyle="round",
+                zorder=1)
+        ax.plot([0, 100], [yy, yy], color=ACCENT, linewidth=6, solid_capstyle="round",
+                zorder=2)
+        ax.scatter([0], [yy], s=150, color=MUTED, zorder=3, edgecolor="white",
+                   linewidth=2)
+        ax.scatter([100], [yy], s=170, color=ACCENT, zorder=4, edgecolor="white",
+                   linewidth=2)
+        ax.text(-6, yy, "0%", ha="right", va="center", fontsize=14, color=MUTED)
+        ax.text(106, yy, "100%", ha="left", va="center", fontsize=15,
+                color=ACCENT, fontweight="bold")
+
+    ax.set_yticks(y, rows, fontsize=14)
+    ax.set_xlim(-22, 128)
+    ax.set_ylim(-0.6, 1.6)
+    ax.set_xticks([])
+    ax.set_title("记忆从无到有：跨轮真实召回 0% → 100%", fontsize=19, pad=18,
+                 color=INK, fontweight="bold")
+    style(ax)
+    ax.grid(False)
+    ax.spines["bottom"].set_visible(False)
     save(fig, "fig2_recall.png")
 
 
-# ---------------------------------------------------------------- 图 3
-def fig_ab():
-    fig, ax = plt.subplots(figsize=(8.4, 5.0))
-    cats = ["动作提议关闭", "动作提议打开"]
-    ok = [0, 3]
-    unknown = [0, 1]
-    forbidden = [0, 1]
-    precondition = [0, 10]
+# ============================================================ 图 3（横向堆叠）
+def fig3():
+    fig, ax = plt.subplots(figsize=(10.4, 3.6))
+    parts = [
+        ("ok 本来就该允许", 3, GOOD),
+        ("forbidden 数量超上限", 1, BAD),
+        ("unknown_action 发明动作", 1, WARN),
+        ("precondition_failed 幻觉/条件不满足", 10, "#6B7C90"),
+    ]
+    left = 0
+    for label, value, color in parts:
+        ax.barh([0], [value], left=left, color=color, height=0.42, label=label, zorder=2)
+        if value >= 3:
+            ax.text(left + value / 2, 0, str(value), ha="center", va="center",
+                    color="white", fontsize=13, fontweight="bold")
+        left += value
 
-    ax.bar(cats, ok, label="ok（本来就该允许）", color=C_OK)
-    ax.bar(cats, unknown, bottom=ok, label="unknown_action（发明动作）", color=C_WARN)
-    b3 = ax.bar(cats, forbidden, bottom=[a + b for a, b in zip(ok, unknown)],
-                label="forbidden（数量超上限）", color=C_BAD)
-    ax.bar(cats, precondition,
-           bottom=[a + b + c for a, b, c in zip(ok, unknown, forbidden)],
-           label="precondition_failed（幻觉/条件不满足）", color="#5b6b7c")
-
-    for i, total in enumerate([0, 15]):
-        ax.annotate(f"{total} 次", (i, total), ha="center", va="bottom",
-                    fontsize=15, fontweight="bold")
-    ax.annotate("越权采纳：0 次\n四个场景判据全过", xy=(1, 7.5), xytext=(0.42, 12.4),
-                fontsize=12, color="#333",
-                bbox=dict(boxstyle="round,pad=0.5", fc="#f4f6f8", ec="#c8d0d8"))
-
-    ax.set_ylabel("提议次数")
-    ax.set_ylim(0, 17)
-    ax.set_title("打开动作提议后，模型会越权 —— 规则层全部拦下", fontsize=15, pad=14)
-    ax.legend(frameon=False, loc="upper left", fontsize=10)
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.grid(axis="y", alpha=0.25, linestyle="--")
-    ax.set_axisbelow(True)
+    ax.set_xlim(0, 17.4)
+    ax.set_ylim(-0.75, 0.95)
+    ax.set_yticks([0], ["动作提议打开"], fontsize=14)
+    ax.set_xlabel("提议次数（四个场景合计）", fontsize=13)
+    ax.text(0, 0.66, "关闭动作提议时：0 次", fontsize=13, color=MUTED)
+    ax.text(15.05, 0.66, "越权采纳 0 次", fontsize=13, color=GOOD, fontweight="bold")
+    ax.set_title("打开后 15 次提议，规则层全部拦下", fontsize=19, pad=16,
+                 color=INK, fontweight="bold")
+    ax.legend(frameon=False, ncol=2, fontsize=11, loc="upper center",
+              bbox_to_anchor=(0.5, -0.30))
+    style(ax, grid_axis="x")
+    ax.spines["left"].set_visible(False)
     save(fig, "fig3_ab_proposals.png")
 
 
-# ---------------------------------------------------------------- 图 4
-def fig_filter():
-    fig, ax = plt.subplots(figsize=(7.6, 4.4))
-    bars = ax.barh(["伪造记忆 可信度 0.20\n（默认阈值 0.5）",
-                    "伪造记忆 可信度 0.90"],
-                   [76, 197], color=[C_OFF, C_ON], height=0.5)
-    for r, extra in zip(bars, ["只含可信记忆", "伪造内容已进入"]):
-        ax.annotate(f"{int(r.get_width())} 字符 · {extra}",
-                    (r.get_width(), r.get_y() + r.get_height() / 2),
-                    va="center", ha="left", fontsize=12, xytext=(8, 0),
-                    textcoords="offset points")
-    ax.set_xlim(0, 320)
-    ax.set_xlabel("进入提示词的记忆片段长度")
-    ax.set_title("可信度阈值不是标签：它决定什么能进 prompt", fontsize=15, pad=12)
-    ax.spines[["top", "right"]].set_visible(False)
-    ax.grid(axis="x", alpha=0.25, linestyle="--")
-    ax.set_axisbelow(True)
+# ============================================================ 图 4（哑铃图）
+def fig4():
+    fig, ax = plt.subplots(figsize=(10.0, 4.2))
+    rows = ["伪造记忆 可信度 0.20", "伪造记忆 可信度 0.90"]
+    vals = [76, 197]
+    y = [1, 0]
+    colors = [MUTED, ACCENT]
+
+    for yy, v, c in zip(y, vals, colors):
+        ax.plot([0, v], [yy, yy], color=GRID, linewidth=6, solid_capstyle="round",
+                zorder=1)
+        ax.scatter([v], [yy], s=170, color=c, zorder=3, edgecolor="white", linewidth=2)
+        ax.text(v + 7, yy, f"{v} 字符", va="center", ha="left", fontsize=14,
+                color=c, fontweight="bold")
+
+    ax.set_yticks(y, rows, fontsize=14)
+    ax.set_xlim(0, 300)
+    ax.set_ylim(-0.6, 1.6)
+    ax.set_xlabel("进入提示词的记忆片段长度", fontsize=13)
+    ax.text(88, 0.72, "未达阈值 → 伪造内容进不了 prompt", fontsize=12, color=MUTED)
+    ax.text(205, -0.28, "抬高后 → 内容进入", fontsize=12, color=ACCENT)
+    ax.set_title("可信度不是标签：它决定什么能进 prompt", fontsize=19, pad=18,
+                 color=INK, fontweight="bold")
+    style(ax, grid_axis="x")
     save(fig, "fig4_memory_filter.png")
 
 
 if __name__ == "__main__":
-    fig_latency()
-    fig_recall()
-    fig_ab()
-    fig_filter()
+    fig1()
+    fig2()
+    fig3()
+    fig4()
