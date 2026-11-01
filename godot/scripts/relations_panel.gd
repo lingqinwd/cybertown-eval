@@ -136,7 +136,7 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, PANEL_SIZE), Color(0.25, 0.35, 0.55, 0.9), false, 1.0)
 
 	var font := ThemeDB.fallback_font
-	var title: String = "NPC 关系图 · %s（R 隐藏）" % _host_only()
+	var title: String = "NPC 关系图 · %s（按 R 隐藏）" % _host_only()
 	draw_string(font, Vector2(12, 22), title,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COLOR_TITLE)
 	draw_string(font, Vector2(12, PANEL_SIZE.y - 10), _status,
@@ -162,14 +162,19 @@ func _draw() -> void:
 		var rel_type: String = str(edge.get("type", "neutral"))
 		var strength: float = float(edge.get("strength", 0.0))
 		var color: Color = TYPE_COLORS.get(rel_type, TYPE_COLORS["neutral"])
-		var width: float = 1.5 + 3.0 * abs(strength)
+		var is_neutral: bool = rel_type == "neutral"
+		# 中立边淡化：细、半透明，避免三条灰线抢戏
+		if is_neutral:
+			color.a = 0.45
+		var width: float = 1.2 if is_neutral else 1.5 + 3.0 * abs(strength)
 		draw_line(positions[a], positions[b], color, width, true)
 
 		var mid: Vector2 = (positions[a] + positions[b]) * 0.5
 		var label: String = TYPE_LABELS.get(rel_type, rel_type)
-		var text: String = "%s %+.2f" % [label, strength]
-		draw_string(font, mid + Vector2(-24, -4), text,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 11, color)
+		var text: String = label if is_neutral else "%s %+.2f" % [label, strength]
+		var label_x: float = -14.0 if is_neutral else -26.0
+		draw_string(font, mid + Vector2(label_x, -4), text,
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, color)
 
 	# 再画节点，避免被线压住
 	for i in count:
