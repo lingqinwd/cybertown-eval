@@ -254,6 +254,32 @@ E:\Software\Godot\Godot-4.5.2\Godot_v4.5.2-stable_win64_console.exe --headless ^
 这检查的是「能不能看清」的客观前提（不越界、不压住对话框、节点不重叠），
 **不是审美**。配色与字号是否顺眼仍需人看一眼。
 
+## 一键起演示
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\run_demo.ps1
+# 只起后端并造数据，不开游戏：
+powershell -ExecutionPolicy Bypass -File tools\run_demo.ps1 -NoGame
+```
+
+脚本做四件事：找可用解释器 → 起后端（独立窗口）→ 施加 4 次关系事件 → 打开游戏。
+它填的是三个真实踩过的坑：
+
+| 坑 | 现象 | 脚本怎么处理 |
+|---|---|---|
+| PATH 上的 `python` 是 Anaconda 基础环境 | `No module named uvicorn`，后端根本不启动，面板显示"暂无关系数据" | 优先用 `E:\Conda\envs\helloagents\python.exe`，并先 `import uvicorn, fastapi` 验证，失败就明确报错 |
+| PowerShell 里 `curl.exe -d "{\"k\":\"v\"}"` 转义被吃 | 后端返回 422 `JSON decode error`，事件没生效 | 改用 `Invoke-RestMethod` + `ConvertTo-Json` + UTF-8 字节，不做手工转义 |
+| PS 5.1 按 ANSI 读无 BOM 的 .ps1 | 整个脚本报 `Missing closing '}'` | 脚本保存为 UTF-8 **带 BOM** |
+| `Invoke-RestMethod` 解析无 charset 的 JSON | 中文全变乱码（`å¼ ä¸`） | 用 `RawContentStream` + `UTF8.GetString` 手工解码 |
+
+### 面板没数据时怎么自查
+
+面板标题会显示后端地址，底部会显示原因：
+
+- `连不上 127.0.0.1:8000（后端没启动？）` → 后端没起来（最常见：`python` 缺 uvicorn）
+- `后端返回 404/422（路径或参数不对）` → 地址拼错，或造数据的事件请求非法
+- `节点 3 · 边 3` → 正常
+
 ## 边界（不假装）
 
 1. **关系只由显式事件驱动，不从对话里自动推断。** 自动推断需要 LLM 判定"这句话算不算帮忙"，

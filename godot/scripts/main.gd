@@ -81,8 +81,8 @@ func get_npc_node(npc_name: String) -> Node2D:
 
 
 func _auto_screenshot() -> void:
-	"""等 3 秒（让面板拉到数据）后导出视口图像，然后退出。仅自动化验证用。"""
-	await get_tree().create_timer(3.0).timeout
+	"""等 8 秒（让面板拉到数据 / 走完失败分支）后导出视口图像，然后退出。仅自动化验证用。"""
+	await get_tree().create_timer(8.0).timeout
 	var image: Image = get_viewport().get_texture().get_image()
 	if image == null:
 		print("[ERROR] 取不到视口图像")

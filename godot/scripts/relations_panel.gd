@@ -19,6 +19,7 @@ var _elapsed: float = 0.0
 var _nodes: Array = []
 var _edges: Array = []
 var _status: String = "等待后端…"
+var _url: String = ""
 
 const TYPE_COLORS := {
 	"friend": Color(0.36, 0.86, 0.46),
@@ -85,22 +86,41 @@ func _refresh() -> void:
 	var base_url: String = "/relations/graph"
 	if typeof(Config) != TYPE_NIL:
 		base_url = Config.API_BASE_URL + "/relations/graph"
+	_url = base_url
 	var err := _http.request(base_url)
 	if err != OK:
-		_status = "请求失败（" + str(err) + "）"
-		queue_redraw()
+		_set_status("请求发起失败 err=%d" % err)
 
 
-func _on_request_completed(_result: int, response_code: int,
+func _host_only() -> String:
+	"""把 http://host:port/relations/graph 缩短成 host:port，标题和报错里显示。"""
+	var u: String = _url
+	u = u.replace("http://", "").replace("https://", "")
+	var slash: int = u.find("/")
+	if slash > 0:
+		u = u.substr(0, slash)
+	return u
+
+
+func _set_status(text: String) -> void:
+	_status = text
+	if typeof(Config) != TYPE_NIL and Config.DEBUG_MODE:
+		print("[WARN] 关系面板: ", text)
+	queue_redraw()
+
+
+func _on_request_completed(result: int, response_code: int,
 		_headers: PackedStringArray, body: PackedByteArray) -> void:
+	if result != HTTPRequest.RESULT_SUCCESS:
+		# 后端没启动时最常见就是这个分支：连接被拒 / 超时
+		_set_status("连不上 %s（后端没启动？）" % _host_only())
+		return
 	if response_code != 200:
-		_status = "后端返回 " + str(response_code)
-		queue_redraw()
+		_set_status("后端返回 %d（路径或参数不对）" % response_code)
 		return
 	var parsed: Variant = JSON.parse_string(body.get_string_from_utf8())
 	if typeof(parsed) != TYPE_DICTIONARY:
-		_status = "数据格式异常"
-		queue_redraw()
+		_set_status("数据格式异常")
 		return
 	var data: Dictionary = parsed
 	_nodes = data.get("nodes", [])
@@ -116,8 +136,9 @@ func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, PANEL_SIZE), Color(0.25, 0.35, 0.55, 0.9), false, 1.0)
 
 	var font := ThemeDB.fallback_font
-	draw_string(font, Vector2(12, 22), "NPC 关系图（R 隐藏）",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, COLOR_TITLE)
+	var title: String = "NPC 关系图 · %s（R 隐藏）" % _host_only()
+	draw_string(font, Vector2(12, 22), title,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 13, COLOR_TITLE)
 	draw_string(font, Vector2(12, PANEL_SIZE.y - 10), _status,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 12, COLOR_TEXT)
 
