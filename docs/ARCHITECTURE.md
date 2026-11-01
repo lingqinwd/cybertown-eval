@@ -87,7 +87,7 @@ JupyterHub 平台的后端端口在反向代理后面，需要登录 Cookie。`t
 2. **工作记忆的检索是本地 TF-IDF，不是向量检索。** 它依赖空格与词边界分词，对中文失效，
    必须打补丁才召回得到（`patches/apply_working_memory_fix.py`）。
 3. **episodic 检索每轮都会执行**（哪怕集合是空的）。它不是"初始化依赖"——
-   实测它在每轮里占掉固定时间，还曾因为 `QDRANT_URL` 写成 `localhost` 而每轮多花约 2 秒。
+   实测它在每轮里都会占掉一段固定时间；配置不当会明显放大（见 TROUBLESHOOTING 坑 12）。
    见 [../experiments/STAGE_TIMING.md](../experiments/STAGE_TIMING.md)。
 
 ## 分阶段计时

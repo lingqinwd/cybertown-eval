@@ -194,9 +194,8 @@ Qwen 无记忆组的那段错误内容可在 `backend/agents.py` 第 78 行的�
 只换 embedding 的位置:**远程 DashScope 2.10×**(每轮多 1112 ms)、
 **本地 MiniLM 1.12×**(每轮多 44 ms)。所以 1.25× vs 3.12× 的差异主要来自
 **embedding 的部署位置**,不是设备快慢。
-   附带一条教训:第一版复现曾得到 3.75×/3.13×,后来分阶段计时查出其中每轮 2.08 s
-   是 `QDRANT_URL` 写成 `localhost` 导致优先连 IPv6 `::1` 的超时,与记忆无关。
-   详见 `experiments/MATRIX_REPLICATION.md` 与 `experiments/STAGE_TIMING.md`。
+   注:早期一次复现的数据受本机 `localhost` 解析影响(每轮多约 2 秒),
+   已改用 `127.0.0.1` 并重跑;旧 CSV 仅留档,**引用请用 `matrix_fixed_*.csv`**。
 
 ## 5. 复现所需的环境修正
 

@@ -305,23 +305,14 @@ heapq.heappush(self.memory_heap, (-priority, memory_item.timestamp, next(self._s
 
 （memory_heap 的消费处也要相应调整取值下标。）本轮未实施，仅记录。
 
-## 坑 12：`QDRANT_URL` 写 `localhost` 会每轮多花约 2 秒
+## 坑 12：`QDRANT_URL` 建议写 `127.0.0.1` 而不是 `localhost`
 
-**现象**：memory=on 时每轮多出约 2 秒，与检索到几条无关、第 1 轮就已出现。
-分阶段计时显示时间全在 `retrieve`；再拆到子调用，落在
-`vector_store.search_similar`（2051 ms），而 `embedder.encode` 只要 9 ms、
-`doc_store` 只要 1 ms，集合里还是 0 个点。
+双栈机器上 `localhost` 会同时解析出 `::1` 与 `127.0.0.1`。若向量库只绑了 IPv4
+（Docker 默认如此），每次请求会先连 `[::1]` 等超时再回退，实测每轮多约 2 秒。
 
-**原因**：`.env` 里写的是 `QDRANT_URL=http://localhost:6333`。这台机器 `localhost`
-同时解析出 `::1` 与 `127.0.0.1`，而 Docker 端口只绑了 `127.0.0.1` —— 每次请求先去连
-`[::1]:6333`，等约 2 秒超时再回退到 IPv4。
-
-**解法**：写成 `http://127.0.0.1:6333`。改完后同一调用 2051 ms → **6 ms**。
-
-**排查脚本**：`python tools/bench_episodic.py`（把 `retrieve` 拆成 embed / vector_search /
+改成 `http://127.0.0.1:6333` 后，同一次向量检索从 2051 ms 降到 6 ms。
+排查工具：`python tools/bench_episodic.py`（把 `retrieve` 拆成 embed / vector_search /
 doc_store 三段计时）。
-
-> 附带结论：`qdrant-client` 版本不是原因 —— 换成 1.9.2 后仍是 2.05 s。
 
 ## 一键自检
 
