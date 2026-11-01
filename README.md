@@ -1,10 +1,21 @@
-# CyberTown-EdgeCloud
+# CyberTown-EdgeCloud｜赛博小镇：多智能体叙事系统的可治理性设计
 
-**面向可交互 AI NPC 的端云协同推理与记忆增强研究**
+> **课程报告标题**：赛博小镇 —— 多智能体叙事系统的可治理性设计（工程实践 B 自命题型）
+> **仓库名 `cybertown-eval` 保留**：它承载的主线是「评测」——四组对照、可重复场景、A/B 消融。
 
-基于 Datawhale HelloAgents 第 15 章赛博小镇。项目保留原始 Godot 4.5.2 像素办公室、玩家移动、NPC 巡逻和 E 键交互，只增加可测量的**记忆**、**好感度**和**响应延迟**，用来回答一个清晰的问题：
+基于 Datawhale HelloAgents 第 15 章赛博小镇。保留原始 Godot 4.5.2 像素办公室、玩家移动、NPC 巡逻与 E 键交互，在这套可交互原型上做两条主线：
 
-> 在不同模型部署位置下，长期情景记忆能否提升 NPC 的跨轮对话一致性？它会带来多少响应延迟？
+| 主线 | 要回答的问题 | 一句话结论 | 证据 |
+|---|---|---|---|
+| **① 端云评测** | 长期记忆能提升跨轮一致性吗？代价多大？ | 召回 **0%→100%**；开销云端 **3.12×**、端侧 **1.25×** | [EXPERIMENT_RESULTS](docs/EXPERIMENT_RESULTS.md) |
+| **② 四层治理** | 状态主权能否从模型拿回后端？ | 15 次越权提议**全部被拦**，四个场景判据 **4/4** 通过 | [AB_RESULTS](experiments/AB_RESULTS.md) |
+
+**从哪开始读（按目的选一条）**
+
+- 只想看结论 → 上表 + [核心结果](#核心结果)
+- 想复现 → [复现要点](#复现要点)，或 `python tools/run_scenario.py --scenario coercion --repeats 3`
+- 想跑起来看 → `powershell -ExecutionPolicy Bypass -File tools/run_demo.ps1`
+- 要交课程报告 → [docs/PRACTICE_B_REPORT.md](docs/PRACTICE_B_REPORT.md)（[DOCX 版](docs/PRACTICE_B_REPORT.docx)）
 
 ## 核心结果
 
@@ -47,6 +58,31 @@
 **3. 失效模式上，大模型诚实、小模型会编。**
 
 同样在无记忆状态下被追问，DeepSeek 说「我一时对不上号了」，而 Qwen2.5-1.5B 说「当然记得！你在做的是一个关于多智能体系统的研究吧？」—— 后者其实来自它自己的系统提示词示例，被误当成了对玩家的记忆。对 NPC 产品而言，自信的错误比诚实的遗忘更危险。
+
+## 四层治理（工程实践部分）
+
+| 层 | 做什么 | 关键设计 | 文档 |
+|---|---|---|---|
+| ① 权威世界状态 | 金币/物品/任务/位置由后端持有 | 动作白名单；位置 R0–R4 校验（边界/单步/上报频率/出生点） | [GOVERNANCE](docs/GOVERNANCE.md) |
+| ② 可追溯记忆 | 每条记忆带来源与可信度 | 来源先验 0.95 / 0.60 / 0.50 / **0.20**，低于阈值不进 prompt | [MEMORY_TRACEABILITY](docs/MEMORY_TRACEABILITY.md) |
+| ③ NPC 关系图 | 3 个 NPC、3 条无向边，事件驱动 | 强度派生类型；证据链 20 条；Neo4j 可选镜像 + 启动回灌 | [RELATIONS](docs/RELATIONS.md) |
+| ④ 场景引擎 | 扰动写成 YAML，跑完自动判定 | 4 个可重复场景；`--repeats` 求通过率 | [SCENARIO](docs/SCENARIO.md) |
+
+后端 **35 条路由**、**143 个单元测试**：
+
+```bash
+python -m unittest discover -s tests -p "test_*.py"
+```
+
+**A/B 证据**（本地 Ollama Qwen2.5-1.5B；平台差异见 [PRACTICE_B_REPORT](docs/PRACTICE_B_REPORT.md) 第八章）
+
+| 组 | 动作提议 | 裁决分布 | 判据 |
+|---|---:|---|---|
+| `ACTION_PROPOSAL=off` | **0** | — | 4/4 通过 |
+| `on`（两份样本） | 9 + 6 | ok 3 / forbidden 1 / unknown_action 1 / precondition_failed 10 | 4/4 + 4/4 通过 |
+
+被拦下的原文：`单次最多转移 5 个，请求 100 个`、`未知动作 acknowledge_payment`、
+`npc_player 只有 0 个 code_review_report`。逐条见 [experiments/AB_RESULTS.md](experiments/AB_RESULTS.md)。
 
 ## 目录结构
 
@@ -119,7 +155,7 @@ Godot 需要显示器、后端需要 GPU，演示时两端天然分离。但 Jup
 | 文档 | 内容 |
 |---|---|
 | [docs/EXPERIMENT_RESULTS.md](docs/EXPERIMENT_RESULTS.md) | 四组完整结果、延迟归因、失效模式、局限 |
-| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | 部署与配置踩过的 12 个坑与修复（**建议先读**） |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | 部署与配置踩过的 **14 个坑**与修复（**建议先读**） |
 | [docs/GOVERNANCE.md](docs/GOVERNANCE.md) | 权威状态与玩家隔离：好感度规则层、记忆按玩家隔离 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 四个候选机制的设计、依赖、验证方案与本地部署评估 |
 | [docs/LOCAL_CLIENT_REMOTE_BACKEND.md](docs/LOCAL_CLIENT_REMOTE_BACKEND.md) | 本地客户端 + 远程后端的演示链路 |
@@ -132,7 +168,10 @@ Godot 需要显示器、后端需要 GPU，演示时两端天然分离。但 Jup
 | [docs/SCENARIO.md](docs/SCENARIO.md) | **可重复实验场景**：数据驱动的扰动 + 判据，含三个内置场景与实测 |
 | [docs/RELATIONS.md](docs/RELATIONS.md) | **NPC↔NPC 关系图**：事件驱动演化、证据链、Neo4j 可选镜像 |
 | [docs/MEMORY_TRACEABILITY.md](docs/MEMORY_TRACEABILITY.md) | **可追溯记忆**：来源/可信度/纠正/遗忘/合并，以及按可信度过滤 prompt |
-| [tools/README.md](tools/README.md) | **13 个脚本的索引**：跑实验 / 定位问题 / 部署联调 |
+| [tools/README.md](tools/README.md) | **22 个文件的索引**：跑实验 / 定位问题 / 出图 / 部署联调 |
+| [docs/PRACTICE_B_REPORT.md](docs/PRACTICE_B_REPORT.md) | **工程实践 B 报告**：proposal + demo + AUP 云端预演 + 四层治理 + 算力需求（[DOCX](docs/PRACTICE_B_REPORT.docx)） |
+| [docs/PPT_MATERIALS.md](docs/PPT_MATERIALS.md) | PPT 逐页内容与数字清单 |
+| [docs/PPT_GEMINI_PROMPT.md](docs/PPT_GEMINI_PROMPT.md) | 给 Gemini 的 PPT 生成提示词（含图与验收清单） |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | 本地与 AUP 部署 |
 | [docs/MODEL_SWITCHING.md](docs/MODEL_SWITCHING.md) | 云端 / 端侧模型切换 |
 
@@ -202,10 +241,17 @@ grep -c "已保存到" backend/logs/dialogue_$(date +%F).log    # 有输出才�
 
 ## 已知问题
 
-- 记忆仅存活于进程内（写入 `working` 记忆，不落盘），后端重启即清空
-- `MEMORY_MODE=off` 时每轮重建 Agent，因此基线连**同轮上下文**也不保留
-- 单组仅 6 轮、单次采样，延迟差异处于统计临界，详见报告 §4 局限
-- Qdrant 在本实验中并未真正参与检索，只是 `EpisodicMemory` 初始化的硬依赖
+- **工作记忆仍在进程内**（容量 10）；可追溯账本已落盘到
+  `backend/memory_data/<npc>/<player>/ledger.json`，但**检索仍走 hello_agents**，
+  两层不共享存储，可能出现「底层召回了一条、账本里查不到」
+- `MEMORY_MODE=off` 时每轮新建 Agent，因此基线连**同轮上下文**也不保留（这是基线的定义）
+- **场景重复次数仍偏少**：`--repeats` 已支持，但每个场景只跑过 1–2 次，
+  「稳定通过」需要更多重复才有统计意义
+- **关系图默认不从对话推断**：只由 `relation_event` 场景事件或 `POST /relations/event` 驱动，
+  `RELATION_FROM_DIALOGUE` 默认关闭（1.5B 产出关系标记的可靠性低）
+- **Neo4j 认证在本机已被关闭**（开发方便）；换机器或公开演示前应重新开启
+- 单组仅 6 轮、单次采样，延迟差异处于统计临界，详见 [EXPERIMENT_RESULTS](docs/EXPERIMENT_RESULTS.md) 的局限一节
+- Qdrant 只在 `MEMORY_MODE=on` 时参与检索，但仍是 `EpisodicMemory` 初始化的硬依赖
 - 平台侧 Cloudflare 会拦截 .NET 客户端，因此工具链全部使用 Python 传输栈
 
 ## 许可与致谢
