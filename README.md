@@ -34,6 +34,12 @@
 
 端侧字多了、耗时按比例涨，**每字成本几乎不变**；云端字数反而变少、耗时却翻三倍，**增量根本不在生成环节**。这对应架构差异：云端每次检索要调远程 embedding 接口，端侧是本地计算。
 
+**这条归因后来做了受控验证**（[experiments/MATRIX_REPLICATION.md](experiments/MATRIX_REPLICATION.md)）：
+在本机 RTX 3050 上，同一模型、同一脚本，**只换 embedding 的位置**——
+远程 DashScope **2.10×**（每轮多 1112 ms），本地 MiniLM **1.12×**（多 44 ms）。
+分阶段计时确认这些时间都落在检索，而不是生成
+（[experiments/STAGE_TIMING.md](experiments/STAGE_TIMING.md)）。
+
 **3. 失效模式上，大模型诚实、小模型会编。**
 
 同样在无记忆状态下被追问，DeepSeek 说「我一时对不上号了」，而 Qwen2.5-1.5B 说「当然记得！你在做的是一个关于多智能体系统的研究吧？」—— 后者其实来自它自己的系统提示词示例，被误当成了对玩家的记忆。对 NPC 产品而言，自信的错误比诚实的遗忘更危险。
@@ -55,16 +61,33 @@ serve_qwen.py 本地 OpenAI 兼容服务（vLLM 在 ROCm 下不可用时的替�
 
 ## 三种运行方式
 
-### ① 全本地（最简单，适合开发）
+### ① 全本地（完全离线，可用 Ollama）
 
-后端和模型都在本机，Godot 用默认地址直连。
+后端、模型、向量库都在本机，**不访问任何云服务**。Godot 用默认地址直连。
 
 ```bash
+# 1) 模型：Ollama 提供 OpenAI 兼容接口，后端不用改一行代码
+ollama pull qwen2.5:1.5b
+ollama serve                        # 默认 127.0.0.1:11434
+
+# 2) 向量库（只有 MEMORY_MODE=on 需要）
+docker start helloagents-qdrant-ch15
+
+# 3) 后端
 cd backend
-cp .env.deepseek.example .env      # 填 DEEPSEEK_API_KEY
+cp .env.deepseek.example .env
 pip install -r requirements.txt
+export LLM_PROVIDER=openai \
+       LLM_BASE_URL=http://127.0.0.1:11434/v1 \
+       LLM_MODEL_ID=qwen2.5:1.5b \
+       LLM_API_KEY=ollama \
+       QDRANT_URL=http://127.0.0.1:6333      # ← 不要写 localhost，见坑 12
 python -m uvicorn main:app --port 8000
 ```
+
+> 用本地 embedding（`EMBED_MODEL_TYPE=local`）还需要 `torch` + `sentence-transformers`，
+> 并且必须把 `EMBED_BASE_URL` / `EMBED_API_KEY` 置空 —— 否则会报「所有嵌入模型都不可用」，
+> 原因见 `docs/TROUBLESHOOTING.md` 坑 9 / 坑 10。
 
 ### ② 端侧远程（本项目的实验形态）
 
@@ -92,13 +115,16 @@ Godot 需要显示器、后端需要 GPU，演示时两端天然分离。但 Jup
 | 文档 | 内容 |
 |---|---|
 | [docs/EXPERIMENT_RESULTS.md](docs/EXPERIMENT_RESULTS.md) | 四组完整结果、延迟归因、失效模式、局限 |
-| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | 端侧部署踩过的 8 个坑与修复（**建议先读**） |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | 部署与配置踩过的 12 个坑与修复（**建议先读**） |
 | [docs/GOVERNANCE.md](docs/GOVERNANCE.md) | 权威状态与玩家隔离：好感度规则层、记忆按玩家隔离 |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | 四个候选机制的设计、依赖、验证方案与本地部署评估 |
 | [docs/LOCAL_CLIENT_REMOTE_BACKEND.md](docs/LOCAL_CLIENT_REMOTE_BACKEND.md) | 本地客户端 + 远程后端的演示链路 |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 系统架构与实验开关 |
 | [docs/CLASS_PRESENTATION_3MIN.md](docs/CLASS_PRESENTATION_3MIN.md) | 3 分钟课堂汇报稿 |
 | [experiments/README.md](experiments/README.md) | 数据文件说明与口径陷阱 |
+| [experiments/MATRIX_REPLICATION.md](experiments/MATRIX_REPLICATION.md) | 本地 A-B-B-A 复现与受控对照（含一次被推翻的结论） |
+| [experiments/STAGE_TIMING.md](experiments/STAGE_TIMING.md) | 延迟分阶段分解，以及那个 2 秒假开销的定位过程 |
+| [tools/README.md](tools/README.md) | **13 个脚本的索引**：跑实验 / 定位问题 / 部署联调 |
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | 本地与 AUP 部署 |
 | [docs/MODEL_SWITCHING.md](docs/MODEL_SWITCHING.md) | 云端 / 端侧模型切换 |
 
