@@ -278,6 +278,33 @@ model_name = os.getenv("EMBED_MODEL_NAME", default_model)
 > 排查顺序：`EMBED_MODEL_TYPE` → `EMBED_MODEL_NAME` → 两个远程变量是否为空。
 > 诊断脚本：`python tools/diag_embedding.py`（逐分支打印 traceback）。
 
+## 坑 11：一轮里连写两条记忆可能抛 TypeError（潜伏崩溃）
+
+**现象**：TypeError: '<' not supported between instances of 'MemoryItem' and 'MemoryItem'，
+抛出点在 hello_agents/memory/types/working.py 的
+`heapq.heappush(self.memory_heap, (-priority, memory_item.timestamp, memory_item))`。
+
+**原因**：堆里存的是三元组，比较到第三项（MemoryItem）才会出问题。只要两条记忆的
+-priority 与 	imestamp 都相同，Python 就会去比较 MemoryItem —— 而它不可比较。
+Windows 的 datetime.now() 分辨率约 1–15 ms，同一轮里连续写入"玩家说 / 我说"两条，
+完全可能拿到同一个时间戳。
+
+**影响**：这条路径在 _save_conversation_to_memory 里，是每轮对话都会走的。
+实测在 benchmark 中稳定复现。
+
+**临时规避**：两次写入之间加一个小间隔（	ools/bench_retrieve.py 里就是这么绕开的）。
+
+**彻底修法**：给堆元组加一个单调递增的序号作为决胜项，例如
+
+```python
+# working.py
+self._seq = itertools.count()
+...
+heapq.heappush(self.memory_heap, (-priority, memory_item.timestamp, next(self._seq), memory_item))
+```
+
+（memory_heap 的消费处也要相应调整取值下标。）本轮未实施，仅记录。
+
 ## 一键自检
 
 `run_aup.sh` 把这些检查都固化了:

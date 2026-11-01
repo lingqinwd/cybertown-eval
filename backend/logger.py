@@ -108,6 +108,9 @@ def log_metrics_csv(metrics: dict):
     fields = ["timestamp", "model_profile", "mode", "npc", "player_id", "message", "latency_ms",
               "memory_recall_count", "affinity_before", "affinity_after",
               "affinity_proposed", "affinity_rule_status", "affinity_rule_notes",
+              "prompt_chars", "reply_chars",
+              "t_retrieve_ms", "t_context_ms", "t_generate_ms", "t_action_ms",
+              "t_affinity_ms", "t_save_ms",
               "request_failed"]
     exists = METRICS_FILE.exists()
     with METRICS_FILE.open("a", encoding="utf-8-sig", newline="") as f:

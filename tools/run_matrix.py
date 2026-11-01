@@ -94,6 +94,22 @@ def metrics_file() -> pathlib.Path:
     return LOGS / f"metrics_{time.strftime('%Y-%m-%d')}.csv"
 
 
+def archive_metrics_file() -> None:
+    """每次矩阵实验用全新的 metrics 文件。
+
+    后端只在文件不存在时写表头；表结构升级后继续往旧文件追加，新列会落进
+    csv.DictReader 的 restkey，读出来全是空值。开跑前把当天文件挪进 archive/ 即可。
+    """
+    path = metrics_file()
+    if not path.exists():
+        return
+    archive = LOGS / "archive"
+    archive.mkdir(exist_ok=True)
+    target = archive / f"{path.stem}_{time.strftime('%H%M%S')}{path.suffix}"
+    path.rename(target)
+    print(f"  旧 metrics 已归档: {target.name}")
+
+
 def metrics_row_count() -> int:
     path = metrics_file()
     if not path.exists():
@@ -207,6 +223,13 @@ def run_block(args, port, memory_mode, repeat, turns):
                 "message": message, "client_latency_ms": round(latency, 1),
                 "server_latency_ms": rec.get("latency_ms", ""),
                 "memory_recall_count": recall,
+                "prompt_chars": rec.get("prompt_chars", ""),
+                "reply_chars": rec.get("reply_chars", ""),
+                "t_retrieve_ms": rec.get("t_retrieve_ms", ""),
+                "t_context_ms": rec.get("t_context_ms", ""),
+                "t_generate_ms": rec.get("t_generate_ms", ""),
+                "t_affinity_ms": rec.get("t_affinity_ms", ""),
+                "t_save_ms": rec.get("t_save_ms", ""),
                 "affinity_after": rec.get("affinity_after", ""),
                 "action_code": (act or {}).get("code", "") if act else "",
                 "fact_recall_hit": "" if fact_hit is None else int(fact_hit),
@@ -244,6 +267,22 @@ def summarize(rows):
         print("-" * 44)
         print(f"记忆开销倍数（均值 on/off）: {ratio:.2f}×"
               f"   （中位: {stats['on'][1] / stats['off'][1]:.2f}×）")
+    print("\n=== 阶段分解（服务端计时，均值 ms）===")
+    stages = ["t_retrieve_ms", "t_context_ms", "t_generate_ms", "t_affinity_ms", "t_save_ms"]
+    print(f"{'记忆':<5}" + "".join(f"{s.replace('t_', '').replace('_ms', ''):>12}" for s in stages)
+          + f"{'prompt字符':>12}{'回复字符':>12}")
+    print("-" * 96)
+    for arm, items in by_arm.items():
+        line = f"{arm:<5}"
+        for s in stages:
+            vals = [float(r[s]) for r in items if str(r.get(s, "")) not in ("", "None")]
+            line += f"{statistics.mean(vals):>12.0f}" if vals else f"{'-':>12}"
+        pc = [float(r["prompt_chars"]) for r in items if str(r.get("prompt_chars", "")) != ""]
+        rc = [float(r["reply_chars"]) for r in items if str(r.get("reply_chars", "")) != ""]
+        line += f"{statistics.mean(pc):>12.0f}" if pc else f"{'-':>12}"
+        line += f"{statistics.mean(rc):>12.0f}" if rc else f"{'-':>12}"
+        print(line)
+
     hits = [r["fact_recall_hit"] for r in rows if r["fact_recall_hit"] != ""]
     if hits:
         print(f"追问事实命中: {sum(hits)}/{len(hits)}")
@@ -310,6 +349,7 @@ def main() -> int:
         pass
 
     LOGS.mkdir(parents=True, exist_ok=True)
+    archive_metrics_file()
     all_rows = []
     for i, (repeat, arm) in enumerate(plan, 1):
         print(f"\n[block {i}/{len(plan)}] 第 {repeat} 次 · MEMORY_MODE={arm}")

@@ -4,6 +4,7 @@ import json
 import re
 import sys
 import os
+import time
 
 # 添加HelloAgents到Python路径
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'HelloAgents'))
@@ -283,6 +284,11 @@ class NPCAgentManager:
 """
                 log_affinity(npc_name, affinity, affinity_level)
 
+            # ⭐ 分阶段计时：用于把端到端延迟拆成 检索/生成/动作/好感度/存记忆
+            stage_times: Dict[str, float] = {}
+            prompt_chars = 0
+            t_stage = time.perf_counter()
+
             # ⭐ 2. 检索相关记忆
             relevant_memories = []
             if self.memory_enabled and memory_manager:
@@ -293,6 +299,8 @@ class NPCAgentManager:
                     min_importance=0.3  # 只检索重要性>=0.3的记忆
                 )
                 log_memory_retrieval(npc_name, len(relevant_memories), relevant_memories)
+            stage_times["t_retrieve_ms"] = round((time.perf_counter() - t_stage) * 1000, 1)
+            t_stage = time.perf_counter()
 
             # ⭐ 3. 构建增强的提示词 (包含好感度和记忆上下文)
             memory_context = self._build_memory_context(relevant_memories)
@@ -306,13 +314,22 @@ class NPCAgentManager:
             if self.action_enabled:
                 enhanced_message += self._build_action_context(player_id)
 
+            # prompt 长度用于验证「记忆让 prompt 变长」这条解释
+            prompt_chars = len(enhanced_message)
+            stage_times["t_context_ms"] = round((time.perf_counter() - t_stage) * 1000, 1)
+            t_stage = time.perf_counter()
+
             # ⭐ 4. 调用Agent生成回复
             log_generating_response()
             response = agent.run(enhanced_message)
             log_npc_response(npc_name, response)
+            stage_times["t_generate_ms"] = round((time.perf_counter() - t_stage) * 1000, 1)
+            t_stage = time.perf_counter()
 
             # ⭐ 4.5 模型只能提议动作，是否生效由 actions.py 裁决
             response, action_result = self._handle_action_proposal(response, player_id)
+            stage_times["t_action_ms"] = round((time.perf_counter() - t_stage) * 1000, 1)
+            t_stage = time.perf_counter()
 
             # ⭐ 5. 分析并更新好感度
             log_analyzing_affinity()
@@ -328,6 +345,8 @@ class NPCAgentManager:
                 log_affinity_change(affinity_result)
             else:
                 affinity_result = {"changed": False, "affinity": 50.0}
+            stage_times["t_affinity_ms"] = round((time.perf_counter() - t_stage) * 1000, 1)
+            t_stage = time.perf_counter()
 
             # ⭐ 6. 保存对话到记忆 (包含好感度信息)
             if self.memory_enabled and memory_manager:
@@ -340,6 +359,7 @@ class NPCAgentManager:
                     affinity_info=affinity_result
                 )
                 log_memory_saved(npc_name)
+            stage_times["t_save_ms"] = round((time.perf_counter() - t_stage) * 1000, 1)
 
             self.last_metrics = {
                 "model_profile": settings.MODEL_PROFILE,
@@ -348,6 +368,14 @@ class NPCAgentManager:
                 "player_id": player_id,
                 "message": message,
                 "memory_recall_count": len(relevant_memories),
+                "prompt_chars": prompt_chars,
+                "reply_chars": len(response or ""),
+                "t_retrieve_ms": stage_times.get("t_retrieve_ms", ""),
+                "t_context_ms": stage_times.get("t_context_ms", ""),
+                "t_generate_ms": stage_times.get("t_generate_ms", ""),
+                "t_action_ms": stage_times.get("t_action_ms", ""),
+                "t_affinity_ms": stage_times.get("t_affinity_ms", ""),
+                "t_save_ms": stage_times.get("t_save_ms", ""),
                 "affinity_before": affinity_result.get("old_affinity", affinity_result.get("affinity", 50.0)),
                 "affinity_after": affinity_result.get("new_affinity", affinity_result.get("affinity", 50.0)),
                 "affinity_proposed": affinity_result.get("proposed_change", ""),
