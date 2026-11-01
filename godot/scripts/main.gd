@@ -15,6 +15,15 @@ var status_update_timer: float = 0.0
 func _ready():
 	print("[INFO] 主场景初始化")
 	
+	# 关系面板（右上角，按 R 显示/隐藏）。只读 /relations/graph，不影响对话逻辑
+	var panel_script: GDScript = load("res://scripts/relations_panel.gd")
+	if panel_script:
+		var panel: Control = panel_script.new()
+		panel.name = "RelationsPanel"
+		add_child(panel)
+	else:
+		print("[WARN] 关系面板脚本未找到")
+
 	# 获取API客户端
 	api_client = get_node_or_null("/root/APIClient")
 	if api_client:

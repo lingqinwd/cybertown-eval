@@ -146,6 +146,54 @@ MERGE (a)-[r:RELATES]->(b) SET r.strength=e.strength, r.type=e.type, r.updated_a
 
 原始输出：`experiments/governance/relations_check.txt`
 
+## Godot 关系面板
+
+`godot/scripts/relations_panel.gd`，由 `godot/scripts/main.gd` 在 `_ready()` 里挂载
+（不改动任何场景文件，也不干预对话与移动逻辑）。
+
+| 项 | 值 |
+|---|---|
+| 位置 | 右上角，380×320，半透明底 |
+| 数据 | 每 5 秒 `GET /relations/graph` 一次 |
+| 显示/隐藏 | `R` 键 |
+| 布局 | NPC 环形排布 |
+| 边的颜色 | 朋友(绿) / 协作(浅绿) / 中立(灰) / 竞争(橙) / 冲突(红) |
+| 边的粗细 | 随 \|strength\| 变化（1.5 + 3×\|s\|） |
+| 标注 | 边上标「类型 ±强度」，底部显示「节点 N · 边 M」或错误原因 |
+| 副作用 | **只读**。后端不可用时只显示「请求失败」，不影响游戏 |
+
+### 怎么跑
+
+```powershell
+# 1) 起后端（关系图数据来源；不需要记忆，所以 MEMORY_MODE=off 即可）
+cd E:\graduate_student\AI\cybertown-eval\backend
+$env:MEMORY_MODE='off'
+python -m uvicorn main:app --port 8000
+
+# 2) 造点关系数据（或直接跑 rivalry 场景）
+curl.exe -s -X POST http://127.0.0.1:8000/relations/reset -H "Content-Type: application/json" -d "{}"
+curl.exe -s -X POST http://127.0.0.1:8000/relations/event -H "Content-Type: application/json" ^
+  -d "{\"kind\":\"compete\",\"actors\":[\"张三\",\"王五\"]}"
+
+# 3) 打开 Godot（三种方式任选）
+#    a) 直接运行项目，自动加载主场景
+E:\Software\Godot\Godot-4.5.2\Godot_v4.5.2-stable_win64.exe --path E:\graduate_student\AI\cybertown-eval\godot
+#    b) 编辑器里打开 project.godot，按 F5
+#    c) 双击 godot/project.godot
+```
+
+面板会立刻显示当前关系；按 `R` 可以隐藏/显示。想看到明显变化，就多施加几次
+`compete` / `help` 事件（或用场景引擎跑 `rivalry`）。
+
+### 已验证到什么程度
+
+| 检查 | 方式 | 结果 |
+|---|---|---|
+| 脚本能加载、无解析错误 | `godot --headless --path ... --quit` | 无 SCRIPT ERROR / Parse Error |
+| 面板随主场景创建 | 同一命令的 stdout | `[INFO] 关系面板已就绪（按 R 显示/隐藏）` |
+| 真实拉到数据 | 窗口模式运行 10 秒的 stdout | `[INFO] 关系面板刷新: 节点 3 · 边 3`（两次，间隔 5 秒） |
+| **版式与观感** | 人工目视 | **待确认** —— 我无法看图，请跑一次看右上角是否被遮挡/字是否重叠 |
+
 ## 边界（不假装）
 
 1. **关系只由显式事件驱动，不从对话里自动推断。** 自动推断需要 LLM 判定"这句话算不算帮忙"，
