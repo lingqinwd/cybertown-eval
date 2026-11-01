@@ -68,7 +68,7 @@
 | ③ NPC 关系图 | 3 个 NPC、3 条无向边，事件驱动 | 强度派生类型；证据链 20 条；Neo4j 可选镜像 + 启动回灌 | [RELATIONS](docs/RELATIONS.md) |
 | ④ 场景引擎 | 扰动写成 YAML，跑完自动判定 | 4 个可重复场景；`--repeats` 求通过率 | [SCENARIO](docs/SCENARIO.md) |
 
-后端 **35 条路由**、**143 个单元测试**：
+后端 **32 条业务路由**、**143 个单元测试**：
 
 ```bash
 python -m unittest discover -s tests -p "test_*.py"
